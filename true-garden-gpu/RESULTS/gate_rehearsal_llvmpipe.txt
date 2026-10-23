@@ -1,0 +1,75 @@
+# GPU-022 replay bundle rehearsal on LLVMPipe, cloud container, 2026-10-23T21:38:53Z. NOT a hardware run.
+# bundle gate/gpu022-bundle.tar.gz sha256 aa314a7a973fcbdc60a3b153a4b83c31f1b44b93b89e7ec0245be4f498521091; numpy made unimportable (PYTHONPATH shim) to mirror the PS4
+
+=== case pass: steps ABC
+=== A: compile only
+RESULT: PASS
+GL_RENDERER: llvmpipe (LLVM 20.1.2, 256 bits) | GL_VERSION: OpenGL ES 3.2 Mesa 25.2.8-0ubuntu0.24.04.4
+=== B: GLSL helpers, 7 dispatches
+COMPARE B: PASS, 7 outputs bit-exact
+=== C: layer 0 chained on the GPU, 182 dispatches
+COMPARE C: PASS, 26 outputs bit-exact
+COMPARE C: PASS, 52 outputs bit-exact
+COMPARE C: PASS, 78 outputs bit-exact
+COMPARE C: PASS, 104 outputs bit-exact
+COMPARE C: PASS, 130 outputs bit-exact
+COMPARE C: PASS, 156 outputs bit-exact
+COMPARE C: PASS, 182 outputs bit-exact
+GATE RESULT: PASS for steps ABC (189 dispatches)
+exit 0
+
+=== case tamper: steps ABC
+HOLD: bundle hash mismatch (see bundle-check.txt) (before step A: nothing touched the GPU)
+exit 2
+
+=== case rtzB: steps ABC
+=== A: compile only
+RESULT: PASS
+GL_RENDERER: llvmpipe (LLVM 20.1.2, 256 bits) | GL_VERSION: OpenGL ES 3.2 Mesa 25.2.8-0ubuntu0.24.04.4
+=== B: GLSL helpers, 7 dispatches
+DIFF B1_f16r (stage B1_f16r, step -1): 12031 values differ, first at index 16
+COMPARE B: FAIL, 1 of 7 outputs differ; first: B1_f16r
+RESULT: FAIL in part B (the driver differs from IEEE somewhere); part C not run
+exit 4
+
+=== case rtzC: steps C
+=== C: layer 0 chained on the GPU, 182 dispatches
+DIFF C0_24_ffn_out_q8k (stage ffn_out_q8k, step 0): 310 values differ, first at index 0
+DIFF C0_25_ffn_out (stage ffn_out, step 0): 1024 values differ, first at index 0
+DIFF C0_26_l_out (stage l_out, step 0): 1024 values differ, first at index 0
+COMPARE C: FAIL, 15 of 26 outputs differ; first: C0_12_kpack
+RESULT: FAIL at decode step 0 (first differing output above)
+exit 4
+
+=== TESTS/test_gate_stops.sh on bundle a2472e72441e0f4d... (gate v3)
+ok   baseline A: exit 0
+ok   baseline ABC (run dir in RAM, copied): exit 0
+ok   jbd2 in D 2 of 3 samples: exit 0
+ok   flush stuck, disk completing I/O: exit 0
+ok   flush stuck, no I/O completing: exit 2
+ok   user process stuck, no I/O: exit 2
+ok   user process stuck, I/O completing: exit 0
+ok   GPU kthread stuck, I/O completing: exit 2
+ok   unexplained kthread stuck, no I/O: exit 2
+ok   kthread stuck, no I/O, D_ALLOW matches: exit 0
+ok   storage kthread, no I/O, D_ALLOW tries: exit 2
+ok   two reasons reported together: exit 2
+ok   GPU fault after ring-buffer wrap: exit 2
+ok   mmc0 timeout, not ignored: exit 2
+ok   mmc0 timeout, DMESG_IGNORE: exit 0
+ok   GPU fault, DMESG_IGNORE for mmc0: exit 2
+ok   GPU runner still alive: exit 2
+ok   GL libraries do not load: exit 2
+ok   software renderer: exit 2
+ok   hardware renderer, not Liverpool: exit 2
+ok   Liverpool renderer (as seen 2026-10-23): exit 0
+ok   wrong boot id: exit 2
+RESULT: PASS (22 ok, 0 wrong)
+
+# bundle build log (gate v3)
+plan: B 7 dispatches, C 182 dispatches over 7 steps; 52 input files
+replay vs references (llama.cpp tensors for layer 0, CPU references for helpers): 126/126 bit-exact
+GL_RENDERER: llvmpipe (LLVM 20.1.2, 256 bits) | GL_VERSION: OpenGL ES 3.2 Mesa 25.2.8-0ubuntu0.24.04.4
+COMPARE B: PASS, 7 outputs bit-exact
+[21:48:54] GATE RESULT: PASS for steps ABC (189 dispatches)
+bundle: /home/user/ChatGPT/true-garden-gpu/gate/gpu022-bundle.tar.gz (16M), 257 files, sha256 a2472e72441e0f4d65ed99a10bee6f6e144408216c7d5e006000a8b54d87b8b1

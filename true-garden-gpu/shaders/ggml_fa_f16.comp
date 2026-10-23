@@ -1,0 +1,124 @@
+// ggml-exact single-query flash attention (decode step), F16 K/V cache.
+//
+// Reproduces, bit for bit, ggml_compute_forward_flash_attn_ext_f16_one_chunk
+// of llama.cpp 23b0202a on an AVX+F16C (no AVX2/FMA) CPU, i.e. the CPU oracle
+// on the PS4's Jaguar cores:
+//   * Q rounded to FP16 (round-to-nearest-even) before the K.Q dot
+//   * K.Q dot over FP16 operands in ggml's 4 accumulators x 8 lanes order,
+//     multiply then add (no FMA), F32x8_REDUCE horizontal order
+//   * online softmax: s*scale (+0 mask), new max -> VKQ *= expf(Mold-M),
+//     else vs = expf(s-M); expf is glibc's generic algorithm
+//   * VKQ accumulator held in FP16: rounded (RNE) after the rescale and
+//     after every V*vs accumulation
+//   * S = S*ms + vs; output = VKQ * (1/S) with a correctly rounded 1/S
+// FP16 rounding is done in integer arithmetic, never with packHalf2x16,
+// whose rounding mode GLSL leaves to the driver.
+//
+// One workgroup per query head, one invocation per head dimension.
+// Buffers: q[n_head*D] f32; k/v: FP16 bit patterns, two per uint, laid out
+// [n_kv][n_head_kv][D]; o[n_head*D] f32.
+// Valid range: expf arguments in [-87.3, 88.7] are exact; below -87.3 the
+// result is subnormal and may differ in the last subnormal bit, which ggml's
+// FA cannot observe (it is absorbed by S >= 1 and by the FP16 accumulator).
+
+#ifndef HEAD_DIM
+#define HEAD_DIM 128
+#endif
+layout(local_size_x = HEAD_DIM) in;
+
+layout(std430, binding = 0) readonly buffer Params { int n_kv; int n_head; int n_head_kv; uint scale_bits; } P;
+layout(std430, binding = 1) readonly buffer Qb { float q[]; };
+layout(std430, binding = 2) readonly buffer Kb { uint k16[]; };
+layout(std430, binding = 3) readonly buffer Vb { uint v16[]; };
+layout(std430, binding = 4) writeonly buffer Ob { float o[]; };
+
+
+// requires ggml_exact_lib.glsl (prepended by the harness)
+
+float load_f16(uint idx, bool is_k) {
+    uint w = is_k ? k16[idx >> 1] : v16[idx >> 1];
+    return f16_to_f32((w >> (16u * (idx & 1u))) & 0xffffu);
+}
+
+// ---------------------------------------------------------------- attention
+
+shared float qq[HEAD_DIM];
+shared float part[32];
+shared float sh_ms;
+shared float sh_vs;
+shared bool sh_newmax;
+shared float sh_sinv;
+
+void main() {
+    uint h = gl_WorkGroupID.x;
+    uint d = gl_LocalInvocationID.x;
+    uint rk = uint(P.n_head / P.n_head_kv);
+    uint kvh = h / rk;
+    float scale = uintBitsToFloat(P.scale_bits);
+
+    qq[d] = f16r(q[h * uint(HEAD_DIM) + d]);
+    barrier();
+
+    float vkq = 0.0;          // FP16-valued accumulator element d
+    float S = 0.0;            // only meaningful in invocation 0
+    float M = uintBitsToFloat(0xff800000u);
+
+    for (int ic = 0; ic < P.n_kv; ic++) {
+        uint kbase = (uint(ic) * uint(P.n_head_kv) + kvh) * uint(HEAD_DIM);
+        if (d < 32u) {        // lane l of accumulator j, ggml_vec_dot_f16 order
+            precise float acc = 0.0;
+            for (uint i = 0u; i < uint(HEAD_DIM) / 32u; i++) {
+                uint idx = 32u * i + d;
+                precise float prod = load_f16(kbase + idx, true) * qq[idx];
+                acc = prod + acc;
+            }
+            part[d] = acc;
+        }
+        barrier();
+        if (d == 0u) {
+            precise float a0[8];
+            for (int l = 0; l < 8; l++) {
+                precise float x0 = part[l] + part[16 + l];       // x[0] += x[2]
+                precise float x1 = part[8 + l] + part[24 + l];   // x[1] += x[3]
+                a0[l] = x0 + x1;                                 // x[0] += x[1]
+            }
+            precise float t0 = a0[0] + a0[4];
+            precise float t1 = a0[1] + a0[5];
+            precise float t2 = a0[2] + a0[6];
+            precise float t3 = a0[3] + a0[7];
+            precise float u0 = t0 + t1;
+            precise float u1 = t2 + t3;
+            precise float s = u0 + u1;
+            s = s * scale;
+            s = s + 0.0;
+            float ms = 1.0;
+            float vs = 1.0;
+            bool newmax = s > M;
+            if (newmax) {
+                float Mold = M;
+                M = s;
+                ms = glibc_expf(Mold - M);
+            } else {
+                vs = glibc_expf(s - M);
+            }
+            precise float Sm = S * ms;
+            S = Sm + vs;
+            sh_ms = ms;
+            sh_vs = vs;
+            sh_newmax = newmax;
+        }
+        barrier();
+        if (sh_newmax) {
+            precise float sc = vkq * sh_ms;
+            vkq = f16r(sc);
+        }
+        precise float pv = load_f16(kbase + d, false) * sh_vs;
+        precise float acc2 = vkq + pv;
+        vkq = f16r(acc2);
+        barrier();
+    }
+    if (d == 0u) sh_sinv = (S == 0.0) ? 0.0 : rcp_cr(S);
+    barrier();
+    precise float outv = vkq * sh_sinv;
+    o[h * uint(HEAD_DIM) + d] = outv;
+}

@@ -1,0 +1,230 @@
+{
+ "schema": "true-garden-gpu-checkpoint/1",
+ "updated_utc": "2026-10-23T22:15:00Z",
+ "repo": "GoldenSend/ChatGPT",
+ "branch": "claude/project-thread-uovzkj",
+ "pull_request": "https://github.com/GoldenSend/ChatGPT/pull/2 (draft)",
+ "prior_commits": [
+  "0bfe711",
+  "b8c9136"
+ ],
+ "environment": {
+  "where": "isolated cloud container; no PS4, no IdeaPad access",
+  "mesa": "25.2.8 LLVMPipe (LLVM 20.1.2)",
+  "gcc": "13.3.0",
+  "glibc": "2.39",
+  "python": "3.13",
+  "numpy": "2.5.3"
+ },
+ "oracle": {
+  "llama_cpp_commit": "23b0202a189c44a54625aadcb37a946dd1d6278d",
+  "flags": "-march=btver2, AVX+F16C+SSE4.2, no AVX2/FMA, GGML_NATIVE=OFF",
+  "flash_attn": "on (auto resolves to on for CPU; verified)"
+ },
+ "candidate": {
+  "name": "ggml-exact GLSL ES 3.2 layer-0 shader set",
+  "state": "PASS_OFFLINE / PASS_HARDWARE_SYNTHETIC (layer 0, 7 steps, Liverpool)",
+  "physical_gpu_evidence": "GPU-022 2026-10-23 boot 092d4a88: A PASS; B 6/7 bit-exact + FTZ (confirmed by hash); C 182/182 bit-exact (RESULTS/gpu022_hardware.txt)",
+  "weights": "synthetic Qwen3-0.6B-shaped, 1 layer, seeds 1-3 (real weights not reachable from the cloud)"
+ },
+ "results": {
+  "emu_vs_oracle": {
+   "label": "ARTIFACT_VERIFIED",
+   "result": "PASS, bit-exact, 3 models",
+   "file": "RESULTS/emu_vs_oracle.txt"
+  },
+  "gles_exact_lib": {
+   "label": "ARTIFACT_VERIFIED",
+   "result": "PASS (2 expf cases where glibc misrounds, ~4e-7 rate)",
+   "file": "RESULTS/gles_exact_lib.txt"
+  },
+  "gles_fa_vs_oracle": {
+   "label": "ARTIFACT_VERIFIED",
+   "result": "59/59 steps bit-exact; RTZ negative control 55/59 fail as required",
+   "file": "RESULTS/gles_fa_vs_oracle.txt"
+  },
+  "gles_matvec_vs_oracle": {
+   "label": "ARTIFACT_VERIFIED",
+   "result": "413/413 bit-exact; row-serial negative control 14/14 differ",
+   "file": "RESULTS/gles_matvec_vs_oracle.txt"
+  },
+  "gles_layer_vs_oracle": {
+   "label": "ARTIFACT_VERIFIED",
+   "result": "59 steps x 17 stages bit-exact, whole layer chained on the GPU driver",
+   "file": "RESULTS/gles_layer_vs_oracle.txt"
+  },
+  "sensitivity": {
+   "label": "ARTIFACT_VERIFIED",
+   "result": "attention semantics fail token 1 in 12/12; matvec lane order 6/12; 'all precise' still 12/12",
+   "file": "RESULTS/sensitivity_summary.md"
+  },
+  "reproduce_from_scratch": {
+   "label": "ARTIFACT_VERIFIED",
+   "result": "all PASS, both negative controls fail as required, model hashes identical",
+   "file": "RESULTS/reproduce_from_scratch.txt"
+  },
+  "gate_rehearsal_llvmpipe": {
+   "label": "ARTIFACT_VERIFIED",
+   "result": "replay bundle: 126/126 reference-backed outputs bit-exact vs llama.cpp/CPU refs; ABC PASS (189 dispatches) from the final .tar.gz with numpy unimportable; wrong boot, software renderer, tampered bundle HOLD (exit 2); RTZ FP16 FAIL in B (B1_f16r) and C step 0 (exit 4). LLVMPipe only, NOT hardware; TESTS/test_gate_stops.sh 22/22 stop paths behave as specified",
+   "file": "RESULTS/gate_rehearsal_llvmpipe.txt"
+  },
+  "gpu022_run1_hardware": {
+   "label": "LIVE_OBS (owner's paste)",
+   "at": "2026-10-23T21:42Z",
+   "boot_id": "092d4a88-7f6f-4c4e-a1e3-238d727d6048",
+   "result": "step A PASS on Liverpool (7/7 shaders compile+link; radeonsi liverpool, LLVM 19.1.7, ES 3.2, Mesa 24.0.9 via run-with-mesa24.sh, GBM renderD128); HOLD at the health check after A: flush-8:0 kworker in D in 5/5 samples; B and C not run; no kernel messages during the run",
+   "follow_up": "read-only check 21:48Z clean (no D, Dirty 136 kB, Writeback 0); no hung-task detector in this kernel; gate v3 (RAM run dir, I/O-progress stall rule); owner approved one rerun 21:45Z into ~/ps4-llm-test/gpu-022b"
+  },
+  "gpu022_run2_hardware": {
+   "label": "LIVE_OBS (owner's paste)",
+   "at": "2026-10-23T21:54Z",
+   "boot_id": "092d4a88-7f6f-4c4e-a1e3-238d727d6048",
+   "result": "A PASS; B 6/7 bit-exact on Liverpool (f16r, glibc expf port, rcp_cr, sqrt_cr, SiLU, RMSNorm); B4 ggml_v_expf 4775/73728 differ, first index 35; C not run (B failure skips C); no HOLD",
+   "explanation": "fp32 denormal flush (FTZ): experiments/ftz/ftz_model.py predicts exactly 4775 diffs from index 35, x <= -81.1; predicted output sha256 131031f6553c5faf684d5f27cba43d68e46b5d50f411b700c0a82bfc28334400 (hardware output hash matched on the PS4, 22:03Z); layer 0 with FTZ in exp functions 3780/3780 identical offline",
+   "file": "RESULTS/ftz_model.txt"
+  },
+  "gpu021_attention_offline": {
+   "label": "ARTIFACT_VERIFIED (LLVMPipe; shader transcribed from the owner's paste, not hash-verified)",
+   "result": "021 attn_two_token_gqa.comp vs llama.cpp FA at token 1: 120/120 cases differ (251-1466 of 2048 values); token 0 exact; the numpy model with only the sequential KQ dot reproduces every count; exp and scale choices change nothing (1 case for exp); l_out changed in 111/120, all 1024 values in 9",
+   "file": "RESULTS/gpu021_attention.json"
+  },
+  "gpu022_run3_hardware": {
+   "label": "LIVE_OBS (owner's paste)",
+   "at": "2026-10-23T22:03Z",
+   "boot_id": "092d4a88-7f6f-4c4e-a1e3-238d727d6048",
+   "result": "C PASS: 182/182 outputs bit-exact over 7 decode steps (n_kv 1..7) on Liverpool; no HOLD; 49 C; ~19.5 s per step of harness overhead",
+   "file": "RESULTS/gpu022_hardware.txt"
+  }
+ },
+ "synthetic_model_sha256": {
+  "synth-f32-s1.gguf": "54de976108c35564530add6cd295a4129b4f6edc8a38dacd333e7f752031be63",
+  "synth-f32-s2.gguf": "699b5057081d3bc6885c76c6e25817155aa723df8cad36ea81a9b19108e93213",
+  "synth-f32-s3.gguf": "2e70bf85791efdebdcb670b43a70881900420deccc86a5581999c0c9819170cf",
+  "synth-q4km-s1.gguf": "49e72c7497c71994ac5ddaae705f00c215acc072b49e914eaa79380b4cda5f2d",
+  "synth-q4km-s2.gguf": "039a2690a76385798453b246163ee4d12507c59cde80de89df2c56f6aaa5f71b",
+  "synth-q4km-s3.gguf": "9116401ebae1279c1bb031eda78293e2dfcf396a11a7313ab816134bb021edf9"
+ },
+ "file_sha256": {
+  "GATE-GPU-022.md": "546ac9e2ba016a93c0077396145779d76517540705636a2932ea7e7bae707b7d",
+  "TESTS/test_emu_vs_oracle.py": "e58ffa6073ed48aa9e8359871308576666242c73ec5b66ea632d5364b26083e7",
+  "TESTS/test_gate_stops.sh": "e5421ac5c0e05691365f0f4c4adf57d570687a9c74df1305b9adf75500844296",
+  "TESTS/test_gles_exact_lib.py": "ea9773f5bdb47e7decc533e8c05217606fcb57a1232113904b637a39cff06674",
+  "TESTS/test_gles_fa_vs_oracle.py": "3554f464b7286b6ea0083e09ae22b53502d9efbd065ada38913809f5c34cc96c",
+  "TESTS/test_gles_layer_vs_oracle.py": "e7368ed645aa0fd552a07ef5104ec2dca6e3aa69e5fa94fbff854bbe03b996e6",
+  "TESTS/test_gles_matvec_vs_oracle.py": "86bb4d28745afd419618c290c87ac1bc77ca047af14bffc08418e55fe719ffe2",
+  "emu/ggml_emu.py": "be87ffffe1df236bc79564a4f66b427b57faf016fb8ec08b2f4f3a6d40d8d559",
+  "emu/glibc_expf.py": "4550e4b996f61af9b3b4c2b059d6acfcee6570b51a1dd61be059c5b37fc1562a",
+  "experiments/ftz/ftz_model.py": "a17711601ac07974448612ff4695e82cb130a9d8f19cd88f24c37cebd37ef026",
+  "experiments/gpu021/attn_two_token_gqa.comp": "c3d7ca782538deeeef005e1373954426ea8882c4a5712e4364d34893a7430814",
+  "experiments/gpu021/run_attention.py": "ec619206bac793c4c73cb6a2f1a4ebd7799ca3b135467586b9d3f35d489846e4",
+  "experiments/sensitivity.py": "87aa4572b8028781ee230a14a392c1cfc8b3e29cfca74cfa21adaf39c34aa082",
+  "experiments/summarize_sensitivity.py": "fb9df999a27c3f99258d8d0a1e0386ad28fb5bd1b80de513e0de69b3336c6845",
+  "reproduce.sh": "8974c7903952a15a3c335c3cb2143b0f481dac260be04da595edd30eef383c08",
+  "shaders/ggml_eltwise.comp": "e8118e7177b5d28de3ce37f5cc07eafabd43444219f2ae57675e074c5fc33967",
+  "shaders/ggml_exact_lib.glsl": "9062b05abf291cf8d59587ad82b48ea5c030ffa7dfbb8040704c651ad4baa568",
+  "shaders/ggml_fa_f16.comp": "2fbea34f626d2343661f8915007e00e8a11eed9f93745d406df23055d4960831",
+  "shaders/ggml_matvec_qk.comp": "7814232fb0de733cd53ec28c5e3429dabdf6ebb224c75a9aea1c1828a0c77595",
+  "shaders/ggml_q8k_quantize.comp": "4aef4cd7facf7acd075b6613df44f6bd6a5188e1eb61ddfb541fb9d444fea856",
+  "shaders/ggml_rms_norm_mul.comp": "692803735adb9c7ca03bd5c86a8a4862599e73dfc1d4ad23e15cf856bfcac31f",
+  "shaders/ggml_rope_neox.comp": "adcf794642658cb55cdad538fe655a2c8686cce865df0934b5f8f1eb11b03f14",
+  "shaders/unit_exact_lib.comp": "2372d52087b957497230a64ee3e3f13a4732b9351c0130ea36014c0994331db7",
+  "tools/build_gate_bundle.sh": "046953bcdac08d88f97c8d55e39a01716dba7f690ee635a9fb50e053f054c091",
+  "tools/compile_check.sh": "5aa2b3a45f6a18402b732d2000c27f6d47549095502546a834cc356bc9aa935e",
+  "tools/dump_layer0.cpp": "d9770d524f1da92f3325fa438ea28de4744b220c61cb0b6422752972a460dcb9",
+  "tools/export_layer0_npz.py": "cdde433ad1573348e54a9ede8dfa0b105a63c74f9060b46c11fddba84f85c0e4",
+  "tools/gate_compare.py": "a0c0f796002fb240cadbe99e7793397b24cc519e1f60eab02dd78ff4e6edf341",
+  "tools/gles_run.c": "12c21509f7c43dba074378926b3459f81346103690b150a133efa19df65e1cd4",
+  "tools/gles_run.py": "15f6ec786840ae1ca585544c19e834e5e36126bddac999a0e42a97df53b80d31",
+  "tools/gles_run_guarded.sh": "ac318a30530097076dd6e41593d1f3ade645f8bf8dd500bf6721a3e66c18fbf4",
+  "tools/gpu022_gate.sh": "49e3864a4300fdc0cc48020c8327124f5b34732d9c6524c64706eeba83ccbb44",
+  "tools/gpu022_preflight.sh": "49da684e8a46b049a199811e6661f986fc4fa0b9b0ab67eff4c00a29a7a6deab",
+  "tools/make_gate_plan.py": "b5834b1549133fdc94881db29d88e8ad8d0f89f0212ecbe1ca593848a2784c0e",
+  "tools/make_synth_qwen3.py": "33b68f0ab5bf3448c3e1971527d32d14ba68ca88d6037e079bc06a09e72c1c09"
+ },
+ "blockers": [
+  {
+   "id": "provenance",
+   "label": "UNKNOWN",
+   "what": "which CPU oracle GPU-016/021 compared against (PS4 CPU llama.cpp? IdeaPad AVX2/FMA build? FA on/off? Python?)",
+   "unblock": "HANDOFF-CODEX.md Job 3"
+  },
+  {
+   "id": "runner_source",
+   "label": "UNKNOWN",
+   "what": "the 021 runner's shader sources are not in the cloud; no diff possible",
+   "unblock": "HANDOFF-CODEX.md Job 3"
+  },
+  {
+   "id": "real_weights",
+   "label": "UNKNOWN",
+   "what": "not run with the real Qwen3-0.6B-Q4_K_M (sha b0638f08...)",
+   "unblock": "HANDOFF-CODEX.md Job 2"
+  },
+  {
+   "id": "codex_quota",
+   "label": "USER_REPORTED",
+   "what": "Codex usage exhausted 2026-10-23; offline jobs go to agy or opencode"
+  },
+  {
+   "id": "ideapad_deps",
+   "label": "USER_REPORTED",
+   "what": "IdeaPad has no numpy and no EGL/GLES headers (owner's report 2026-10-23); HANDOFF-CODEX Jobs 1, 2, 4 blocked until the owner provides them",
+   "unblock": "owner decision (apt or venv); the synthetic GPU-022 bundle no longer depends on it"
+  },
+  {
+   "id": "radeonsi_ftz",
+   "label": "LIVE_OBS",
+   "what": "radeonsi on Liverpool flushes fp32 denormals (GLSL compute); harmless for layer 0, must be kept in mind for any op whose results reach below 1.2e-38"
+  }
+ ],
+ "residual_risks": [
+  "expf ~4e-7 per call vs glibc (glibc misrounds)",
+  "RMSNorm double-float ~48 bits vs ggml's 53-bit double",
+  "q8k quantize uses 256-invocation workgroups (GLES minimum is 128)"
+ ],
+ "next_actions": [
+  {
+   "who": "lead + owner",
+   "what": "GPU-023: the same gate with the real Qwen3-0.6B-Q4_K_M layer-0 weights and llama.cpp dumps; needs a real-weight bundle (layer-0 tensors + dumps from 23b0202a Jaguar build) and the owner's separate approval"
+  },
+  {
+   "who": "lead",
+   "what": "fix proposal for the 021 runner: KQ dot in ggml_vec_dot_f16 lane order (or adopt shaders/ggml_fa_f16.comp)"
+  },
+  {
+   "who": "agy",
+   "what": "HANDOFF-AGY.md adversarial review, now including RESULTS/gpu022_hardware.txt"
+  },
+  {
+   "who": "later",
+   "what": "speed: per-dispatch overhead (persistent context, compiled programs, GPU-resident buffers) before any shader optimisation"
+  }
+ ],
+ "hard_limits": "no PS4 boot/reboot/payload/storage write/kernel or firmware change/GPU dispatch without fresh operation-specific owner approval; owner runs payload sends and boot-ID re-pins; never touch GoldenPi, PS4 #3 or the stream PC",
+ "owner_intent": {
+  "label": "USER_REPORTED",
+  "at": "2026-10-23T20:42Z",
+  "what": "owner chose 'Approve GPU-022 ABC': staging write into new ~/ps4-llm-test/gpu-022/ + one gate run by the owner on the boot pinned after preflight; stock kernel only; no retry; real weights need a separate yes. Remote Control declined; the owner runs the IdeaPad commands; one rerun approved 21:45Z; part C approved 22:02Z; GPU-022 complete 22:05Z"
+ },
+ "gate_bundle": {
+  "path": "gate/gpu022-bundle.tar.gz",
+  "sha256": "a2472e72441e0f4d65ed99a10bee6f6e144408216c7d5e006000a8b54d87b8b1",
+  "files": 257,
+  "size": "16 MB",
+  "content": "plan B 7 dispatches + plan C 182 dispatches (layer 0, 7 decode steps, synth-q4km-s1, dump s1_long), content-addressed inputs, expected/ = verified LLVMPipe replay",
+  "ps4_needs": "bash, coreutils, python3 (stdlib), gzip, libEGL.so.1, libGLESv2.so.2, libgbm.so.1"
+ },
+ "preflight_20261023": {
+  "label": "LIVE_OBS (owner's report)",
+  "at": "2026-10-23T21:27:16Z",
+  "decision": "GO",
+  "boot_id": "092d4a88-7f6f-4c4e-a1e3-238d727d6048",
+  "kernel": "5.4.247-DFAUS-blkscrn_Fix_mt7668_hdmia (stock)",
+  "storage": "sda USB 3.2.1 FD 57.8G only; root /dev/sda2 rw; ext4 errors 0; no Hitachi (not satadiag1)",
+  "d_state": "jbd2/sda2-8, flush-8:0, events_freezable_power_ kworkers each in 1 of 10 samples; wchan '-'",
+  "dmesg": "ata1 ATAPI IDENTIFY failures 7-49 s; 937 mmc0 sdhci timeout lines, last at 533 s; no USB errors",
+  "gpu": "amdgpu 3.35.0, PCI 1002:9923, /dev/dri/renderD128",
+  "gl_libs": "none in /usr/lib/x86_64-linux-gnu; Mesa 24.0.9 runtime run-with-mesa24.sh present (MESA_WRAPPER required)",
+  "gate_changes": "D state must persist 4 s; new dmesg lines by timestamp (ring buffer may wrap); DMESG_IGNORE for mmc0; GL library load check before step A; renderer must contain 'liverpool' like the 021 runner"
+ }
+}

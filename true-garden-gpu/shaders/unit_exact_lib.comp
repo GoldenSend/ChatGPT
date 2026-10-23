@@ -1,0 +1,27 @@
+// Unit test kernel for ggml_exact_lib.glsl: out[i] = f(x[i]) for one helper.
+// MODE 0: f16r (FP32 -> FP16 RNE -> FP32), 1: glibc_expf, 2: rcp_cr, 3: ggml_v_expf,
+// 4: sqrt_cr, 5: ggml silu x / (1 + ggml_v_expf(-x))
+layout(local_size_x = 64) in;
+layout(std430, binding = 0) readonly buffer Xb { float x[]; };
+layout(std430, binding = 1) writeonly buffer Yb { float y[]; };
+uniform int mode;
+uniform int n;
+
+void main() {
+    int stride = int(gl_NumWorkGroups.x * gl_WorkGroupSize.x);
+    for (int i = int(gl_GlobalInvocationID.x); i < n; i += stride) {
+        float v = x[i];
+        float r;
+        if (mode == 0) r = f16r(v);
+        else if (mode == 1) r = glibc_expf(v);
+        else if (mode == 2) r = rcp_cr(v);
+        else if (mode == 3) r = ggml_v_expf(v);
+        else if (mode == 4) r = sqrt_cr(v);
+        else {
+            precise float neg = 0.0 - v;
+            precise float den = 1.0 + ggml_v_expf(neg);
+            r = div_cr(v, den);
+        }
+        y[i] = r;
+    }
+}

@@ -1,0 +1,69 @@
+# Full GPU-chained ggml-exact layer 0 vs llama.cpp, 2026-10-23T20:18:31Z
+GL_RENDERER: llvmpipe (LLVM 20.1.2, 256 bits) | GL_VERSION: OpenGL ES 3.2 Mesa 25.2.8-0ubuntu0.24.04.4
+## model seed s1, dump s1_fa1_t1
+step0 n_kv=  1 l_out BITEXACT ndiff=0 first differing stage: none
+step1 n_kv=  2 l_out BITEXACT ndiff=0 first differing stage: none
+RESULT: PASS (2 steps x 17 stages)
+## model seed s2, dump s2_fa1
+step0 n_kv=  1 l_out BITEXACT ndiff=0 first differing stage: none
+step1 n_kv=  2 l_out BITEXACT ndiff=0 first differing stage: none
+step2 n_kv=  3 l_out BITEXACT ndiff=0 first differing stage: none
+step3 n_kv=  4 l_out BITEXACT ndiff=0 first differing stage: none
+step4 n_kv=  5 l_out BITEXACT ndiff=0 first differing stage: none
+RESULT: PASS (5 steps x 17 stages)
+## model seed s3, dump s3_fa1
+step0 n_kv=  1 l_out BITEXACT ndiff=0 first differing stage: none
+step1 n_kv=  2 l_out BITEXACT ndiff=0 first differing stage: none
+step2 n_kv=  3 l_out BITEXACT ndiff=0 first differing stage: none
+step3 n_kv=  4 l_out BITEXACT ndiff=0 first differing stage: none
+RESULT: PASS (4 steps x 17 stages)
+## model seed s1, dump s1_long
+step0 n_kv=  1 l_out BITEXACT ndiff=0 first differing stage: none
+step1 n_kv=  2 l_out BITEXACT ndiff=0 first differing stage: none
+step2 n_kv=  3 l_out BITEXACT ndiff=0 first differing stage: none
+step3 n_kv=  4 l_out BITEXACT ndiff=0 first differing stage: none
+step4 n_kv=  5 l_out BITEXACT ndiff=0 first differing stage: none
+step5 n_kv=  6 l_out BITEXACT ndiff=0 first differing stage: none
+step6 n_kv=  7 l_out BITEXACT ndiff=0 first differing stage: none
+step7 n_kv=  8 l_out BITEXACT ndiff=0 first differing stage: none
+step8 n_kv=  9 l_out BITEXACT ndiff=0 first differing stage: none
+step9 n_kv= 10 l_out BITEXACT ndiff=0 first differing stage: none
+step10 n_kv= 11 l_out BITEXACT ndiff=0 first differing stage: none
+step11 n_kv= 12 l_out BITEXACT ndiff=0 first differing stage: none
+step12 n_kv= 13 l_out BITEXACT ndiff=0 first differing stage: none
+step13 n_kv= 14 l_out BITEXACT ndiff=0 first differing stage: none
+step14 n_kv= 15 l_out BITEXACT ndiff=0 first differing stage: none
+step15 n_kv= 16 l_out BITEXACT ndiff=0 first differing stage: none
+step16 n_kv= 17 l_out BITEXACT ndiff=0 first differing stage: none
+step17 n_kv= 18 l_out BITEXACT ndiff=0 first differing stage: none
+step18 n_kv= 19 l_out BITEXACT ndiff=0 first differing stage: none
+step19 n_kv= 20 l_out BITEXACT ndiff=0 first differing stage: none
+step20 n_kv= 21 l_out BITEXACT ndiff=0 first differing stage: none
+step21 n_kv= 22 l_out BITEXACT ndiff=0 first differing stage: none
+step22 n_kv= 23 l_out BITEXACT ndiff=0 first differing stage: none
+step23 n_kv= 24 l_out BITEXACT ndiff=0 first differing stage: none
+step24 n_kv= 25 l_out BITEXACT ndiff=0 first differing stage: none
+step25 n_kv= 26 l_out BITEXACT ndiff=0 first differing stage: none
+step26 n_kv= 27 l_out BITEXACT ndiff=0 first differing stage: none
+step27 n_kv= 28 l_out BITEXACT ndiff=0 first differing stage: none
+step28 n_kv= 29 l_out BITEXACT ndiff=0 first differing stage: none
+step29 n_kv= 30 l_out BITEXACT ndiff=0 first differing stage: none
+step30 n_kv= 31 l_out BITEXACT ndiff=0 first differing stage: none
+step31 n_kv= 32 l_out BITEXACT ndiff=0 first differing stage: none
+step32 n_kv= 33 l_out BITEXACT ndiff=0 first differing stage: none
+step33 n_kv= 34 l_out BITEXACT ndiff=0 first differing stage: none
+step34 n_kv= 35 l_out BITEXACT ndiff=0 first differing stage: none
+step35 n_kv= 36 l_out BITEXACT ndiff=0 first differing stage: none
+step36 n_kv= 37 l_out BITEXACT ndiff=0 first differing stage: none
+step37 n_kv= 38 l_out BITEXACT ndiff=0 first differing stage: none
+step38 n_kv= 39 l_out BITEXACT ndiff=0 first differing stage: none
+step39 n_kv= 40 l_out BITEXACT ndiff=0 first differing stage: none
+step40 n_kv= 41 l_out BITEXACT ndiff=0 first differing stage: none
+step41 n_kv= 42 l_out BITEXACT ndiff=0 first differing stage: none
+step42 n_kv= 43 l_out BITEXACT ndiff=0 first differing stage: none
+step43 n_kv= 44 l_out BITEXACT ndiff=0 first differing stage: none
+step44 n_kv= 45 l_out BITEXACT ndiff=0 first differing stage: none
+step45 n_kv= 46 l_out BITEXACT ndiff=0 first differing stage: none
+step46 n_kv= 47 l_out BITEXACT ndiff=0 first differing stage: none
+step47 n_kv= 48 l_out BITEXACT ndiff=0 first differing stage: none
+RESULT: PASS (48 steps x 17 stages)
