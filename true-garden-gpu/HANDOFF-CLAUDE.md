@@ -1,6 +1,6 @@
 # Handoff: next Claude lead
 
-Read `README.md`, then `NUMERICAL-ANALYSIS.md`. State at handoff: the ggml-exact shader set is **PASS_OFFLINE** (LLVMPipe, synthetic Qwen3-shaped weights, 59 decode steps x 17 stages bit-exact) and **HOLD_HARDWARE**. Nothing has run on Liverpool.
+Read `README.md`, then `NUMERICAL-ANALYSIS.md`. State at handoff: the ggml-exact shader set is **PASS_OFFLINE** (LLVMPipe, synthetic Qwen3-shaped weights, 59 decode steps x 17 stages bit-exact) and **PASS_HARDWARE_SYNTHETIC** (GPU-022 on Liverpool, 2026-10-23: layer 0, 7 decode steps, 182/182 bit-exact; fp32 denormals are flushed, harmless for layer 0). Real weights have not run on the GPU.
 
 Hard limits (unchanged): no PS4 boot, reboot, payload send, storage write, kernel or firmware change, or GPU dispatch without the owner's fresh approval for that specific operation. The owner runs payload sends and boot-ID re-pins. Never touch GoldenPi, PS4 #3 or the stream PC.
 
@@ -21,7 +21,7 @@ Hard limits (unchanged): no PS4 boot, reboot, payload send, storage write, kerne
 4. **radeonsi behaviour without hardware.** Read Mesa 24.x radeonsi/ACO or LLVM AMDGPU source for: fp32 denormal mode for compute on gfx7, whether `precise` (NIR `exact`) blocks `v_mad_f32`/`v_fma_f32` formation, and how `/` and `sqrt` lower. On GCN, `v_mad_f32` rounds like a separate multiply and add but does not support denormals, and `v_fma_f32` is fused; either one inside a `precise` path (fused, or with denormal operands) would break exactness.
 5. **Speed.** Matvec as one workgroup per row with ggml's 8-lane assignment and a fixed reduce order; fuse Q8_K quantization with RMSNorm; batch all dispatches of a step into one context instead of one process per op. See `PERFORMANCE.md`: the 46 ms per layer on record is probably overhead, so profile before optimizing arithmetic.
 
-## 3. GPU-022 hardware qualification gate (synthetic weights: APPROVED 2026-10-23 20:42Z)
+## 3. GPU-022 hardware qualification gate (synthetic weights: DONE 2026-10-23, PASS; see GATE-GPU-022.md)
 
 **The exact operation is `GATE-GPU-022.md`.** The owner approved it once (stock kernel, one attempt, no retry, boot ID pinned by the owner). The bundle `gate/gpu022-bundle.tar.gz` is built in the cloud by `tools/build_gate_bundle.sh`: a fixed dispatch plan, content-addressed inputs and LLVMPipe-verified expected outputs. The PS4 replays it with `tools/gles_run.py` (ctypes, GBM like the 021 runner) and compares with `tools/gate_compare.py` (standard library only), so it needs no numpy, compiler or headers. The owner runs the read-only preflight (`tools/gpu022_preflight.sh`), staging and the gate; the lead decides GO or HOLD from the preflight and writes the exact gate command (boot ID, `GLES_DRM_DEVICE`, `D_ALLOW`, `MESA_WRAPPER`).
 

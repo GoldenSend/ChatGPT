@@ -62,7 +62,16 @@ cd $M/repo && git pull -q && bash true-garden-gpu/tools/gpu022_preflight.sh 2>&1
 - Explanation (INFERENCE, exact count match): radeonsi flushes fp32 denormals to zero (FTZ), as GCN compute shaders do by default; LLVMPipe and the CPU keep them. `experiments/ftz/ftz_model.py` replays the shader's operation sequence with every fp32 result flushed and predicts exactly 4775 differing values, the first at index 35, all for inputs at or below -81.1 (results below ~1e-35). Its predicted output hashes to `131031f6...`; the part C command checks the hardware output against that hash, bit for bit, before C runs.
 - Effect on layer 0: none expected. `ggml_v_expf` feeds only SiLU, where `1 + v` with `v < 1e-35` rounds to 1 either way; flash attention's `expf` underflow is absorbed the same way (`S >= 1`, FP16 accumulator). With FTZ in both functions, 3780 of 3780 layer-0 stage outputs stay bit-identical (3 synthetic models x 10 random 7-token sequences). The model covers only the two exp functions; other ops produce no denormals on these inputs (INFERENCE).
 - `B2_glibc_expf` only tested inputs down to -87.3 (no denormal results), so it could not see FTZ.
-- Part C (182 dispatches) needs a new owner approval; asked 2026-10-23 ~22:00Z.
+- Part C (182 dispatches) needed a new owner approval; the owner chose "Run part C once" at 22:02Z.
+
+## Run 3 (2026-10-23 22:03Z, owner-approved part C, folder gpu-022b): C PASS
+
+- Before C, on the PS4: `gate-out-20261023T215411Z/out/B4_ggml_v_expf.bin: OK` against the FTZ model's predicted hash `131031f6...`. Liverpool's `ggml_v_expf` output equals the denormal-flushing model bit for bit, so FTZ is the only difference in part B (LIVE_OBS).
+- Part C: **182 of 182 outputs bit-exact**, compared after each of the 7 decode steps (n_kv 1 to 7). Every output with a llama.cpp reference (119) therefore equals llama.cpp `23b0202a` (Jaguar flags, flash attention on) on Liverpool. No HOLD; aftercare: same boot, no process in D, 49 C.
+- About 19.5 s per decode step (26 dispatches): mostly the harness, which starts a process, an EGL context and a shader compile per dispatch. Not a GPU speed measurement.
+- Full log excerpts: `RESULTS/gpu022_hardware.txt`.
+
+**GPU-022 outcome:** A PASS; B 6/7 bit-exact plus one fully explained FTZ difference that cannot reach layer 0; C PASS. Claim, exactly: layer 0 of a Qwen3-0.6B-shaped model (synthetic weights), 7 decode steps, bit-exact on Liverpool against llama.cpp `23b0202a` with Jaguar flags and flash attention on. Nothing about the real weights, other layers or speed.
 
 ## Phase 2: what the approval covers
 

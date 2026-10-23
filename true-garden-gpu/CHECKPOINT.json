@@ -1,6 +1,6 @@
 {
  "schema": "true-garden-gpu-checkpoint/1",
- "updated_utc": "2026-10-23T22:05:00Z",
+ "updated_utc": "2026-10-23T22:15:00Z",
  "repo": "GoldenSend/ChatGPT",
  "branch": "claude/project-thread-uovzkj",
  "pull_request": "https://github.com/GoldenSend/ChatGPT/pull/2 (draft)",
@@ -23,8 +23,8 @@
  },
  "candidate": {
   "name": "ggml-exact GLSL ES 3.2 layer-0 shader set",
-  "state": "PASS_OFFLINE / HOLD_HARDWARE",
-  "physical_gpu_evidence": "none",
+  "state": "PASS_OFFLINE / PASS_HARDWARE_SYNTHETIC (layer 0, 7 steps, Liverpool)",
+  "physical_gpu_evidence": "GPU-022 2026-10-23 boot 092d4a88: A PASS; B 6/7 bit-exact + FTZ (confirmed by hash); C 182/182 bit-exact (RESULTS/gpu022_hardware.txt)",
   "weights": "synthetic Qwen3-0.6B-shaped, 1 layer, seeds 1-3 (real weights not reachable from the cloud)"
  },
  "results": {
@@ -80,13 +80,20 @@
    "at": "2026-10-23T21:54Z",
    "boot_id": "092d4a88-7f6f-4c4e-a1e3-238d727d6048",
    "result": "A PASS; B 6/7 bit-exact on Liverpool (f16r, glibc expf port, rcp_cr, sqrt_cr, SiLU, RMSNorm); B4 ggml_v_expf 4775/73728 differ, first index 35; C not run (B failure skips C); no HOLD",
-   "explanation": "fp32 denormal flush (FTZ): experiments/ftz/ftz_model.py predicts exactly 4775 diffs from index 35, x <= -81.1; predicted output sha256 131031f6553c5faf684d5f27cba43d68e46b5d50f411b700c0a82bfc28334400 (hardware hash not yet checked); layer 0 with FTZ in exp functions 3780/3780 identical offline",
+   "explanation": "fp32 denormal flush (FTZ): experiments/ftz/ftz_model.py predicts exactly 4775 diffs from index 35, x <= -81.1; predicted output sha256 131031f6553c5faf684d5f27cba43d68e46b5d50f411b700c0a82bfc28334400 (hardware output hash matched on the PS4, 22:03Z); layer 0 with FTZ in exp functions 3780/3780 identical offline",
    "file": "RESULTS/ftz_model.txt"
   },
   "gpu021_attention_offline": {
    "label": "ARTIFACT_VERIFIED (LLVMPipe; shader transcribed from the owner's paste, not hash-verified)",
    "result": "021 attn_two_token_gqa.comp vs llama.cpp FA at token 1: 120/120 cases differ (251-1466 of 2048 values); token 0 exact; the numpy model with only the sequential KQ dot reproduces every count; exp and scale choices change nothing (1 case for exp); l_out changed in 111/120, all 1024 values in 9",
    "file": "RESULTS/gpu021_attention.json"
+  },
+  "gpu022_run3_hardware": {
+   "label": "LIVE_OBS (owner's paste)",
+   "at": "2026-10-23T22:03Z",
+   "boot_id": "092d4a88-7f6f-4c4e-a1e3-238d727d6048",
+   "result": "C PASS: 182/182 outputs bit-exact over 7 decode steps (n_kv 1..7) on Liverpool; no HOLD; 49 C; ~19.5 s per step of harness overhead",
+   "file": "RESULTS/gpu022_hardware.txt"
   }
  },
  "synthetic_model_sha256": {
@@ -98,7 +105,7 @@
   "synth-q4km-s3.gguf": "9116401ebae1279c1bb031eda78293e2dfcf396a11a7313ab816134bb021edf9"
  },
  "file_sha256": {
-  "GATE-GPU-022.md": "c9978a9f29030f95c0fc3b73e77f7e2054377f818b0a5876edbe07b7cb5b699f",
+  "GATE-GPU-022.md": "546ac9e2ba016a93c0077396145779d76517540705636a2932ea7e7bae707b7d",
   "TESTS/test_emu_vs_oracle.py": "e58ffa6073ed48aa9e8359871308576666242c73ec5b66ea632d5364b26083e7",
   "TESTS/test_gate_stops.sh": "e5421ac5c0e05691365f0f4c4adf57d570687a9c74df1305b9adf75500844296",
   "TESTS/test_gles_exact_lib.py": "ea9773f5bdb47e7decc533e8c05217606fcb57a1232113904b637a39cff06674",
@@ -154,12 +161,6 @@
    "unblock": "HANDOFF-CODEX.md Job 2"
   },
   {
-   "id": "radeonsi_ieee",
-   "label": "UNKNOWN",
-   "what": "denormal handling and contraction under `precise` on Liverpool",
-   "unblock": "GPU-022 steps A-B (owner approval required)"
-  },
-  {
    "id": "codex_quota",
    "label": "USER_REPORTED",
    "what": "Codex usage exhausted 2026-10-23; offline jobs go to agy or opencode"
@@ -169,6 +170,11 @@
    "label": "USER_REPORTED",
    "what": "IdeaPad has no numpy and no EGL/GLES headers (owner's report 2026-10-23); HANDOFF-CODEX Jobs 1, 2, 4 blocked until the owner provides them",
    "unblock": "owner decision (apt or venv); the synthetic GPU-022 bundle no longer depends on it"
+  },
+  {
+   "id": "radeonsi_ftz",
+   "label": "LIVE_OBS",
+   "what": "radeonsi on Liverpool flushes fp32 denormals (GLSL compute); harmless for layer 0, must be kept in mind for any op whose results reach below 1.2e-38"
   }
  ],
  "residual_risks": [
@@ -178,27 +184,27 @@
  ],
  "next_actions": [
   {
-   "who": "owner",
-   "what": "decide on GPU-022 part C (decision card); the command checks the B4 hash against the FTZ prediction before running C"
+   "who": "lead + owner",
+   "what": "GPU-023: the same gate with the real Qwen3-0.6B-Q4_K_M layer-0 weights and llama.cpp dumps; needs a real-weight bundle (layer-0 tensors + dumps from 23b0202a Jaguar build) and the owner's separate approval"
   },
   {
    "who": "lead",
-   "what": "read gate.log and gate-out-*; offline: run the GPU-021 attention shader against the oracle dumps (NUMERICAL-ANALYSIS section 7)"
+   "what": "fix proposal for the 021 runner: KQ dot in ggml_vec_dot_f16 lane order (or adopt shaders/ggml_fa_f16.comp)"
   },
   {
    "who": "agy",
-   "what": "HANDOFF-AGY.md adversarial review"
+   "what": "HANDOFF-AGY.md adversarial review, now including RESULTS/gpu022_hardware.txt"
   },
   {
-   "who": "next Claude lead",
-   "what": "after a GPU-022 PASS: real-weights gate (HANDOFF-CLAUDE.md section 3), needs its own approval"
+   "who": "later",
+   "what": "speed: per-dispatch overhead (persistent context, compiled programs, GPU-resident buffers) before any shader optimisation"
   }
  ],
  "hard_limits": "no PS4 boot/reboot/payload/storage write/kernel or firmware change/GPU dispatch without fresh operation-specific owner approval; owner runs payload sends and boot-ID re-pins; never touch GoldenPi, PS4 #3 or the stream PC",
  "owner_intent": {
   "label": "USER_REPORTED",
   "at": "2026-10-23T20:42Z",
-  "what": "owner chose 'Approve GPU-022 ABC': staging write into new ~/ps4-llm-test/gpu-022/ + one gate run by the owner on the boot pinned after preflight; stock kernel only; no retry; real weights need a separate yes. Remote Control declined; the owner runs the IdeaPad commands"
+  "what": "owner chose 'Approve GPU-022 ABC': staging write into new ~/ps4-llm-test/gpu-022/ + one gate run by the owner on the boot pinned after preflight; stock kernel only; no retry; real weights need a separate yes. Remote Control declined; the owner runs the IdeaPad commands; one rerun approved 21:45Z; part C approved 22:02Z; GPU-022 complete 22:05Z"
  },
  "gate_bundle": {
   "path": "gate/gpu022-bundle.tar.gz",

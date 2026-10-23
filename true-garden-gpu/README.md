@@ -1,14 +1,14 @@
 # True Garden: Liverpool GPU numerical lane
 
-Offline engineering for running Qwen3 layer 0 on the PS4 Liverpool GPU (GLES 3.2 compute) so that it matches the PS4's CPU llama.cpp **bit for bit**. Prepared 2026-10-23 in an isolated cloud container. **Nothing here has run on a PS4.**
+Offline engineering for running Qwen3 layer 0 on the PS4 Liverpool GPU (GLES 3.2 compute) so that it matches the PS4's CPU llama.cpp **bit for bit**. Prepared 2026-10-23 in an isolated cloud container. **GPU-022 then ran on the PS4 (owner-approved): layer 0, synthetic weights, 7 decode steps, 182/182 outputs bit-exact on Liverpool.** Real weights are next.
 
 ## The short version
 
 - Physical runs GPU-016 and GPU-021b pass token 0 and fail token 1 (`USER_REPORTED`). Token 0 cannot see Q, K, the softmax or RoPE at all, so it is not evidence that those parts are right (`NUMERICAL-ANALYSIS.md` section 4).
 - llama.cpp quantizes every matvec input to Q8_K. One code flip changes all 1024 outputs of the layer, so "more precise" GPU math does not converge to the CPU; only the **same rounding sequence** does (section 5).
-- The likeliest remaining cause on hardware is the attention algorithm itself (FP16 Q, online softmax, FP16 accumulator rounded at each step), then matvec lane order (section 6, `RESULTS/sensitivity_summary.md`).
+- The likeliest remaining cause on hardware is the attention algorithm itself (FP16 Q, online softmax, FP16 accumulator rounded at each step), then matvec lane order (section 6, `RESULTS/sensitivity_summary.md`). The GPU-021 attention shader, once read, had the right softmax and accumulator but summed the Q·K dot product in index order; that alone breaks token 1 in 120/120 offline cases (section 7.1).
 - `shaders/` reproduces llama.cpp's Jaguar arithmetic in GLSL. On Mesa LLVMPipe the whole layer, chained on the GPU driver, is **bit-exact for 59 decode steps x 17 stages**, and the negative controls fail as they should.
-- Not yet known: whether radeonsi on Liverpool honours the same IEEE behaviour (denormals, `precise`), and which oracle GPU-016/021 actually compared against. See `HANDOFF-CLAUDE.md` for the bounded hardware gate. It needs the owner's explicit approval to run.
+- On Liverpool (GPU-022, `GATE-GPU-022.md`): all shaders compile under radeonsi; the helpers are bit-exact except that fp32 denormals are flushed (confirmed bit for bit against a model; harmless for layer 0); the whole layer is bit-exact for 7 decode steps. Still unknown: the real weights, other layers, speed, and which oracle GPU-016/021 compared against.
 
 ## Layout
 

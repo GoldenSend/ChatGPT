@@ -1,0 +1,53 @@
+# GPU-022 on the physical PS4 (True Garden, Liverpool), 2026-10-23. LIVE_OBS via the owner's pasted terminal output.
+# Boot 092d4a88-7f6f-4c4e-a1e3-238d727d6048, kernel 5.4.247-DFAUS-blkscrn_Fix_mt7668_hdmia, Mesa 24.0.9 runtime via
+# run-with-mesa24.sh, GBM on /dev/dri/renderD128. Synthetic Qwen3-0.6B-shaped weights (synth-q4km-s1). Oracle: llama.cpp
+# 23b0202a, -march=btver2 (AVX+F16C, no AVX2/FMA), flash attention on.
+
+## Run 1 (21:42Z, folder gpu-022, bundle aa314a7a...): A PASS, then HOLD before any dispatch
+ggml_eltwise.comp          compiled OK; local size 64x1x1; GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS 1024
+ggml_fa_f16.comp           compiled OK; local size 128x1x1; GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS 1024
+ggml_matvec_qk.comp        compiled OK; local size 64x1x1; GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS 1024
+ggml_q8k_quantize.comp     compiled OK; local size 256x1x1; GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS 1024
+ggml_rms_norm_mul.comp     compiled OK; local size 128x1x1; GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS 1024
+ggml_rope_neox.comp        compiled OK; local size 64x1x1; GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS 1024
+unit_exact_lib.comp        compiled OK; local size 64x1x1; GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS 1024
+RESULT: PASS
+GL_RENDERER: AMD Radeon Graphics (radeonsi, liverpool, LLVM 19.1.7, DRM 3.35, 5.4.247-DFAUS-blkscrn_Fix_mt7668_hdmia) | GL_VERSION: OpenGL ES 3.2 Mesa 24.0.9
+[21:42:44] HOLD: process stuck in D state for 4 s or more:    7169       2 D    -                                kworker/u16:2+flush-8:0
+# read-only check 21:48Z: no D state over 5 s, Dirty 136 kB, Writeback 0, dmesg unchanged during the run, no hung-task detector
+
+## Run 2 (21:54Z, approved rerun, folder gpu-022b, bundle a2472e72...): A PASS, B 6/7, C skipped by rule
+RESULT: PASS   (step A, same 7 shaders, same renderer)
+[21:54:23] === B: GLSL helpers, 7 dispatches
+DIFF B4_ggml_v_expf (stage B4_ggml_v_expf, step -1): 4775 values differ, first at index 35
+COMPARE B: FAIL, 1 of 7 outputs differ; first: B4_ggml_v_expf
+[21:54:30] RESULT: FAIL in part B (the driver differs from IEEE somewhere); part C not run
+[21:54:30]     D-state:    max temp C: 49
+
+## FTZ confirmation (22:03Z, on the PS4, before run 3)
+gate-out-20261023T215411Z/out/B4_ggml_v_expf.bin: OK
+# = sha256 131031f6553c5faf684d5f27cba43d68e46b5d50f411b700c0a82bfc28334400, the output predicted by
+#   experiments/ftz/ftz_model.py (ggml_v_expf with every fp32 denormal flushed). Liverpool's B4 output equals it bit for bit.
+
+## Run 3 (22:03Z, approved part C, folder gpu-022b): C PASS
+[22:03:07] === C: layer 0 chained on the GPU, 182 dispatches
+[22:03:26]     after decode step 0: 26 dispatches
+COMPARE C: PASS, 26 outputs bit-exact
+[22:03:46]     after decode step 1: 52 dispatches
+COMPARE C: PASS, 52 outputs bit-exact
+[22:04:05]     after decode step 2: 78 dispatches
+COMPARE C: PASS, 78 outputs bit-exact
+[22:04:24]     after decode step 3: 104 dispatches
+COMPARE C: PASS, 104 outputs bit-exact
+[22:04:44]     after decode step 4: 130 dispatches
+COMPARE C: PASS, 130 outputs bit-exact
+[22:05:03]     after decode step 5: 156 dispatches
+COMPARE C: PASS, 156 outputs bit-exact
+[22:05:22]     after decode step 6: 182 dispatches
+COMPARE C: PASS, 182 outputs bit-exact
+[22:05:23] GATE RESULT: PASS for steps C (182 dispatches)
+[22:05:23] --- aftercare: boot 092d4a88-7f6f-4c4e-a1e3-238d727d6048 kernel 5.4.247-DFAUS-blkscrn_Fix_mt7668_hdmia
+[22:05:23]     D-state:
+[22:05:23]     max temp C: 49  load: 0.71 0.33 0.18  mem avail MB: 6618
+# expected/ for C = LLVMPipe replay verified bit-exact against llama.cpp tensors (119 stage outputs with references),
+# so every C output on Liverpool equals llama.cpp's layer-0 tensors for those stages, steps 0-6 (n_kv 1..7).

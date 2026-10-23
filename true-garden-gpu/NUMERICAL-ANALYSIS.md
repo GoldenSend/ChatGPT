@@ -114,6 +114,8 @@ So the KQ summation order alone is enough to break token 1, independent of the h
 
 On radeonsi (Mesa 24.0.9, LLVM 19.1.7), the integer FP16 RNE, the glibc expf port, the correctly rounded rcp and sqrt, SiLU and the double-float RMSNorm are bit-exact on the GPU-022 inputs. `ggml_v_expf` differs in 4775 of 73728 values: fp32 denormals are flushed (an FTZ replay of the shader predicts exactly that count and the first index, `RESULTS/ftz_model.txt`), only for inputs at or below -81.1. In layer 0 that function feeds only SiLU, where it cannot matter, and offline layer 0 with FTZ in both exp functions stays bit-identical (3780/3780 stage outputs).
 
+The flushing was then confirmed on the PS4: the Liverpool output of `ggml_v_expf` hashes to exactly the FTZ model's prediction (`131031f6...`). Part C followed: **layer 0 chained on Liverpool, 7 decode steps, 182 of 182 outputs bit-exact** against the LLVMPipe replay that equals llama.cpp `23b0202a` (`RESULTS/gpu022_hardware.txt`). So on this driver, `precise` and the integer/double-float helpers hold through the whole layer, and the token-1 failure of GPU-016/021 is not a hardware limit: it came from the runner's arithmetic order (section 7.1 shows one such order in its attention).
+
 **Smallest missing input:** the 021 runner's shader sources and the script that produced its CPU oracle (see section 9). With those, `experiments/sensitivity.py` can be pointed at the runner's actual arithmetic instead of these generic variants.
 
 ## 8. The candidate correction: ggml-exact shaders (`ARTIFACT_VERIFIED` on LLVMPipe only)
@@ -144,7 +146,7 @@ Results on Mesa 25.2.8 LLVMPipe:
 
 ### Residual risks before any hardware claim
 
-- **Liverpool/radeonsi, partly tested (GPU-022, section 7.2).** All 7 shaders compile; the helpers are bit-exact except where fp32 denormals are flushed (FTZ), which the layer-0 path absorbs. Whether `precise` stops `v_mad`/`v_fma` contraction inside the full layer is answered only by part C.
+- **Liverpool/radeonsi, partly tested (GPU-022, section 7.2).** All 7 shaders compile; the helpers are bit-exact except where fp32 denormals are flushed (FTZ), which the layer-0 path absorbs. Part C then passed: the full layer is bit-exact on Liverpool for 7 decode steps with synthetic weights.
 - **expf ~4e-7 per call** (see table above). One call per head per KV step. A software-fp64 port would remove it.
 - **RMSNorm** uses a ~48-bit double-float in place of ggml's 53-bit double; it can differ when the exact sum of squares sits within ~2^-47 of a float midpoint. No mismatches in 4096 stress rows.
 - **Oracle provenance (section 9).**

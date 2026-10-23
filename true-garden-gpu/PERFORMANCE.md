@@ -1,6 +1,6 @@
 # Performance
 
-No performance was measured on the PS4 in this session, and LLVMPipe timings say nothing about Liverpool, so none are reported. This page keeps the historical measurements and the estimates strictly apart.
+No GPU compute speed was measured on the PS4 in this session, and LLVMPipe timings say nothing about Liverpool. This page keeps measurements and estimates strictly apart.
 
 ## Measured (historical, `USER_REPORTED`, not re-measured)
 
@@ -10,6 +10,12 @@ No performance was measured on the PS4 in this session, and LLVMPipe timings say
 | Hybrid 004 (one Q6_K projection on the GPU) | ~3.00661 t/s vs paired CPU ~7.624 t/s | context packet 2026-10-13 |
 | GPU-021b token 1, one layer | ~46 ms per layer | handoff 2026-10-14 |
 | Same, extrapolated to 28 layers | ~0.8 t/s (an extrapolation, not a measurement) | handoff 2026-10-14 |
+
+## Measured this session (`LIVE_OBS` via the owner, GPU-022 run 3)
+
+| What | Value | Note |
+|---|---|---|
+| Layer 0 on Liverpool through the GPU-022 harness | ~19.5 s per decode step (26 dispatches), ~0.75 s per dispatch | each dispatch starts Python, opens GBM/EGL, compiles the shader (cache disabled by the Mesa wrapper) and reads files; this is harness overhead, not GPU arithmetic, and must not be read as a speed result |
 
 ## Estimates (`INFERENCE`, not measured)
 

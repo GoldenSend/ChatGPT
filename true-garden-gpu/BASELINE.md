@@ -55,7 +55,7 @@ Qwen3-0.6B layer-0 geometry, 1 layer, vocab 512, deterministic. Regenerated twic
 | Whole layer 0 chained on the GPU driver | 59 steps x 17 stages bit-exact | `RESULTS/gles_layer_vs_oracle.txt` |
 | Which GPU-style deviations break token 1 | table, 12 cases per variant | `RESULTS/sensitivity_summary.md` |
 
-State of the candidate: **PASS_OFFLINE (LLVMPipe, synthetic weights) / HOLD_HARDWARE.** It has never run on Liverpool.
+State of the candidate: **PASS_HARDWARE_SYNTHETIC** (GPU-022, 2026-10-23, `LIVE_OBS` via the owner): on Liverpool, layer 0 with synthetic weights is bit-exact for 7 decode steps (182/182 outputs); the helpers are bit-exact except `ggml_v_expf` below 1e-35, where radeonsi flushes denormals (`GATE-GPU-022.md`, `RESULTS/gpu022_hardware.txt`). Real weights: not yet run.
 
 ## 3. Source revisions
 
