@@ -1,6 +1,6 @@
 {
  "schema": "true-garden-gpu-checkpoint/1",
- "updated_utc": "2026-10-23T20:45:00Z",
+ "updated_utc": "2026-10-23T20:50:00Z",
  "repo": "GoldenSend/ChatGPT",
  "branch": "claude/project-thread-uovzkj",
  "pull_request": "https://github.com/GoldenSend/ChatGPT/pull/2 (draft)",
@@ -94,7 +94,8 @@
   "tools/compile_check.sh": "5aa2b3a45f6a18402b732d2000c27f6d47549095502546a834cc356bc9aa935e",
   "tools/dump_layer0.cpp": "d9770d524f1da92f3325fa438ea28de4744b220c61cb0b6422752972a460dcb9",
   "tools/gles_run.c": "12c21509f7c43dba074378926b3459f81346103690b150a133efa19df65e1cd4",
-  "tools/gles_run_guarded.sh": "bfb031ad90722ec869c3be5653ee392c39531b6c1bcf01e06d99a0f78a6fa68f",
+  "tools/gles_run_guarded.sh": "ac318a30530097076dd6e41593d1f3ade645f8bf8dd500bf6721a3e66c18fbf4",
+  "tools/gpu022_gate.sh": "bd56e88879a047f0d4c6aa0a6b809f1d871da4a811725e2bc83aef304e08630c",
   "tools/make_synth_qwen3.py": "33b68f0ab5bf3448c3e1971527d32d14ba68ca88d6037e079bc06a09e72c1c09"
  },
  "blockers": [
@@ -135,6 +136,10 @@
  ],
  "next_actions": [
   {
+   "who": "lead via Remote Control (HP -> IdeaPad -> ps4-garden)",
+   "what": "GATE-GPU-022.md phase 1: read-only PS4 preflight + IdeaPad bundle build; then staging + gate only after the owner's yes"
+  },
+  {
    "who": "owner launches agy/opencode on the IdeaPad",
    "what": "HANDOFF-CODEX.md Jobs 1-4 (offline, no PS4)"
   },
@@ -147,5 +152,10 @@
    "what": "verify offline results, then ask the owner for GPU-022 approval (HANDOFF-CLAUDE.md section 3)"
   }
  ],
- "hard_limits": "no PS4 boot/reboot/payload/storage write/kernel or firmware change/GPU dispatch without fresh operation-specific owner approval; owner runs payload sends and boot-ID re-pins; never touch GoldenPi, PS4 #3 or the stream PC"
+ "hard_limits": "no PS4 boot/reboot/payload/storage write/kernel or firmware change/GPU dispatch without fresh operation-specific owner approval; owner runs payload sends and boot-ID re-pins; never touch GoldenPi, PS4 #3 or the stream PC",
+ "owner_intent": {
+  "label": "USER_REPORTED",
+  "at": "2026-10-23T20:36Z",
+  "what": "owner says a PS4 test is authorized and the PS4 is ready; exact operation GPU-022 ABC (GATE-GPU-022.md) posted for a specific yes"
+ }
 }

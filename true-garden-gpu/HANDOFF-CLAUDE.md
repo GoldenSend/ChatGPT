@@ -23,6 +23,8 @@ Hard limits (unchanged): no PS4 boot, reboot, payload send, storage write, kerne
 
 ## 3. GPU-022 hardware qualification gate (DRAFT, needs explicit owner approval)
 
+**Executable form: `GATE-GPU-022.md` and `tools/gpu022_gate.sh`** (synthetic weights first, rehearsed on LLVMPipe). The steps below are the general design; where they differ, the gate file wins. Real weights come in a second gate after a PASS.
+
 Purpose: find out whether radeonsi on Liverpool reproduces the offline result. It is a qualification of the shader arithmetic, not a speed test and not production use.
 
 **Approval wording to request:** "Approve GPU-022 steps A to C on the stock kernel, one attempt, HOLD on any stop condition." Approval covers this session only. Every step stops the whole gate on any stop condition; no retries inside the session.

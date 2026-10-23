@@ -26,6 +26,7 @@ Offline engineering for running Qwen3 layer 0 on the PS4 Liverpool GPU (GLES 3.2
 | `experiments/` | the sensitivity study (one GPU-style deviation at a time) |
 | `reproduce.sh` | rebuilds every result from scratch |
 | `HANDOFF-CODEX.md`, `HANDOFF-CLAUDE.md`, `HANDOFF-AGY.md` | next work per agent (the Codex file is written for agy or opencode to run, since Codex usage ran out) |
+| `GATE-GPU-022.md` | the exact hardware operation put to the owner, with `tools/gpu022_gate.sh` |
 | `CHECKPOINT.json` | machine-readable state |
 
 ## Reproduce
