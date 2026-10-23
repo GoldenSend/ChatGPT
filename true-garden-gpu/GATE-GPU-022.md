@@ -6,29 +6,29 @@
 
 ## Phase 1: before approval (read-only on the PS4)
 
-Done by the lead through Remote Control on the HP Pavilion, IdeaPad, then `ssh ps4-garden`. Nothing on the PS4 is written.
+The owner runs `tools/gpu022_prepare.sh` on the IdeaPad (the cloud session's safety check refuses remote shell commands on the IdeaPad, so the lead cannot run it). It runs the checks below over `ssh ps4-garden`, samples D-state threads ten times over 20 s with their wait channels, and counts the SATA, mmc0, USB and I/O messages in `dmesg`. Nothing on the PS4 is written. The owner sends back `REPORT.txt`.
 
 | Check | Command | Needed for GO |
 |---|---|---|
 | Kernel | `uname -a; cat /proc/cmdline` | stock kernel (last record `fc5dc10d`, 2026-10-14). If it is satadiag1, stop and ask |
 | HDD visible? | `lsblk -o NAME,SIZE,MODEL,SERIAL` | no Hitachi 320 GB line (that would mean satadiag1) |
 | Boot ID | `cat /proc/sys/kernel/random/boot_id` | recorded; it becomes the pin |
-| Hung tasks | `ps -eo pid,stat,comm \| awk '$2 ~ /^D/'` | prints nothing |
+| Hung tasks | 10 samples of `ps -eo pid,ppid,stat,wchan,comm` | no user process in D; any kernel thread in D is explained by its wait channel and is unrelated to GPU and storage (the 2026-10-23 boot showed fluctuating D-state threads and mmc0 timeouts; mmc0 is probably the SDIO bus of the MT7668 Wi-Fi, which is unverified) |
 | Kernel log | `dmesg --level=err,warn \| tail -40` | no GPU fault, ring timeout or I/O error |
 | Temperature | `cat /sys/class/hwmon/hwmon*/temp*_input` | at or below 75 C |
 | Python | `python3 -c "import numpy; print(numpy.__version__)"` | present (no installs) |
 | Build tools | `gcc --version; ls /usr/include/EGL/egl.h /usr/include/GLES3/gl32.h` | present, or an IdeaPad-built `gles_run` that runs here (`ldd`) |
 | 021 driver setup | read the 021 runner's launch script in `liverpool-021-gate/` | tells whether `MESA_WRAPPER=/home/goldensend/ps4-mesa2409-runtime-20261011/run-with-mesa24.sh` is needed |
 
-On the IdeaPad, in a new directory `~/Projects/atom-ps4-linux-compat-001/gpu-022-offline/`: clone this branch, run `LIBGL_ALWAYS_SOFTWARE=1 WORK=... ./reproduce.sh` (must end `ALL OFFLINE CHECKS DONE`), and pack the bundle:
+The same script, in the new directory `~/Projects/atom-ps4-linux-compat-001/gpu-022-offline/`, runs `reproduce.sh` on LLVMPipe (it must end `ALL OFFLINE CHECKS DONE`) and packs the bundle:
 
 ```
 gpu-022/
   true-garden-gpu/            this folder at the approved commit
-  models/synth-q4km-s1.gguf   sha 49e72c74...      models/synth-q4km-s2.gguf  sha 039a2690...
+  models/synth-q4km-s1.npz, s2.npz   layer-0 tensors of the synthetic models (gguf sha 49e72c74... / 039a2690...),
+                                     so the PS4 needs only numpy (no gguf-py, no PyYAML)
   dumps/s1_fa1_t1/  dumps/s2_fa1/                   (llama.cpp 23b0202a, Jaguar flags)
-  llama-gguf/gguf-py/
-  gles_run                    (built for the PS4, or built on it during staging)
+  gles_run.ideapad            (if the IdeaPad has EGL headers; used on the PS4 only if its glibc allows, else built there)
   SHA256SUMS
 ```
 
@@ -55,7 +55,7 @@ Every dispatch has a 120 s timeout. Between steps the script checks the stop con
 
 **Stop conditions:** the gate halts on the first of any of these, writes `HOLD`, runs aftercare and exits. There is no retry.
 - The boot ID differs from the pin.
-- Any process is in D state.
+- Any user process is in D state, or a kernel thread in D state looks GPU- or storage-related, or matches nothing in `D_ALLOW`. `D_ALLOW` is set only from preflight evidence, e.g. `mmc|sdio`.
 - New kernel messages mention the GPU, DRM, the ring, a timeout, a fault, a hang, an I/O error, a reset or USB.
 - The temperature is above 75 C.
 - A dispatch times out.

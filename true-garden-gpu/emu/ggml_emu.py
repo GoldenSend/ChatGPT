@@ -391,9 +391,13 @@ class Qwen3Layer0:
 
 
 def load_weights(gguf_path, llama_cpp=None):
-    """Read layer-0 tensors (raw quant blocks) from a GGUF via gguf-py."""
+    """Read layer-0 tensors (raw quant blocks) from a GGUF via gguf-py, or from an
+    .npz written by tools/export_layer0_npz.py (needs only numpy, no gguf-py)."""
     import os
     import sys
+    if gguf_path.endswith(".npz"):
+        z = np.load(gguf_path)
+        return {k: (str(z[k]) if k.endswith(".type") else z[k]) for k in z.files}
     if llama_cpp:
         sys.path.insert(0, os.path.join(llama_cpp, "gguf-py"))
     import gguf

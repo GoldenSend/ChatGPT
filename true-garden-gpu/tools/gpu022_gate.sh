@@ -9,15 +9,18 @@
 #   B  helper exactness on the GPU: 7 dispatches (TESTS/test_gles_exact_lib.py, n=65536)
 #   C  layer 0 chained on the GPU vs llama.cpp: 2-step dump (52 dispatches), then
 #      5-step dump (130 dispatches), synthetic Qwen3-0.6B-shaped weights
-# env: GLES_RUN_BIN (built gles_run), BUNDLE (dir with models/, dumps/, llama-gguf/),
+# env: GLES_RUN_BIN (built gles_run), BUNDLE (dir with models/*.npz and dumps/),
 #      MESA_WRAPPER (optional launcher), GLES_TIMEOUT (s per dispatch, default 120),
-#      TEMP_MAX (C, default 75), ALLOW_SOFTWARE=1 (offline rehearsal on LLVMPipe only)
+#      TEMP_MAX (C, default 75), ALLOW_SOFTWARE=1 (offline rehearsal on LLVMPipe only),
+#      D_ALLOW (regex of kernel-thread names/wchans allowed in D state because the
+#      preflight showed them unrelated to the GPU and storage, e.g. 'mmc|sdio';
+#      default: none allowed)
 # Stops on the first problem. Nothing is retried. Exit 0 = every requested step PASS.
 set -u
 EXPECTED=${1:?expected boot id}; STEPS=${2:?steps}
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 BUNDLE=${BUNDLE:?set BUNDLE}; : "${GLES_RUN_BIN:?set GLES_RUN_BIN}"
-export GLES_RUN_BIN GLES_TIMEOUT=${GLES_TIMEOUT:-120} LLAMA_CPP="$BUNDLE/llama-gguf"
+export GLES_RUN_BIN GLES_TIMEOUT=${GLES_TIMEOUT:-120}
 TEMP_MAX=${TEMP_MAX:-75}
 G="$HERE/tools/gles_run_guarded.sh"
 OUT="$BUNDLE/gate-out-$(date -u +%Y%m%dT%H%M%SZ)"; mkdir -p "$OUT/work"; export WORKDIR="$OUT/work"
@@ -25,7 +28,7 @@ log() { echo "[$(date -u +%H:%M:%S)] $*" | tee -a "$OUT/gate.log"; }
 
 snapshot() {  # $1 label; prints state, never stops
     log "--- $1: boot $(cat /proc/sys/kernel/random/boot_id) kernel $(uname -r)"
-    log "    D-state: $(ps -eo pid,stat,comm | awk '$2 ~ /^D/ {printf "%s ", $0}')"
+    log "    D-state: $(ps -eo pid,ppid,stat,wchan:32,comm | awk '$3 ~ /^D/ {printf "[%s] ", $0}')"
     log "    max temp C: $(maxtemp)  load: $(cut -d' ' -f1-3 /proc/loadavg)  mem avail MB: $(awk '/MemAvailable/ {print int($2/1024)}' /proc/meminfo)"
 }
 maxtemp() { cat /sys/class/hwmon/hwmon*/temp*_input 2>/dev/null | sort -n | tail -1 | awk '{print int($1/1000)}'; }
@@ -38,7 +41,15 @@ aftercare() {
 hold() { log "HOLD: $*"; aftercare; exit 2; }
 health() {  # stop conditions, checked before and after every step
     [ "$(cat /proc/sys/kernel/random/boot_id)" = "$EXPECTED" ] || hold "boot id is not the pinned one"
-    local d; d=$(ps -eo pid,stat,comm | awk '$2 ~ /^D/'); [ -z "$d" ] || hold "process in D state: $d"
+    # Any user process in D state stops the gate. A kernel thread (parent 2) in D state
+    # stops it unless its name or wait channel matches D_ALLOW, and never when it
+    # looks GPU- or storage-related.
+    local d; d=$(ps -eo pid,ppid,stat,wchan:32,comm | awk -v allow="${D_ALLOW:-}" '
+        NR > 1 && $3 ~ /^D/ {
+            gs = ($4 $5) ~ /amdgpu|radeon|drm|ttm|fence|gfx|sdma|ring|gpu|kgd|usb|scsi|blk|jbd2|ext4|flush|ata/
+            if ($2 != 2 || gs || allow == "" || ($4 $5) !~ allow) print
+        }')
+    [ -z "$d" ] || hold "process in D state: $d"
     local t; t=$(maxtemp); [ -z "$t" ] || [ "$t" -le "$TEMP_MAX" ] || hold "temperature ${t} C above ${TEMP_MAX} C"
     local now; now=$(dmesg 2>/dev/null | wc -l)
     if [ "$now" -gt "$DMESG0" ]; then
@@ -75,7 +86,7 @@ case "$STEPS" in *C*)
     for d in "s1:s1_fa1_t1" "s2:s2_fa1"; do
         m=${d%%:*}; dump=${d#*:}
         log "=== C: layer 0, model $m, dump $dump"
-        python3 "$HERE/TESTS/test_gles_layer_vs_oracle.py" "$G" "$BUNDLE/models/synth-q4km-$m.gguf" "$BUNDLE/dumps/$dump" > "$OUT/step-c-$dump.txt" 2>&1
+        python3 "$HERE/TESTS/test_gles_layer_vs_oracle.py" "$G" "$BUNDLE/models/synth-q4km-$m.npz" "$BUNDLE/dumps/$dump" > "$OUT/step-c-$dump.txt" 2>&1
         rc=$?; tail -8 "$OUT/step-c-$dump.txt" | tee -a "$OUT/gate.log"
         health
         [ $rc = 0 ] || hold "step C ($dump) did not pass"

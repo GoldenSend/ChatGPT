@@ -74,7 +74,7 @@ Read, without modifying, the GPU-015 software oracle, the 016 evidence and the 0
 
 ## Job 4 (only after Jobs 1 to 3 pass): build the GPU-022 candidate bundle offline
 
-In `$M/bundle/`: the `true-garden-gpu` tree, a copy of `$W/llama.cpp/gguf-py` at `bundle/llama-gguf/gguf-py`, the real-weight dumps for the fixture tokens, and a `SHA256SUMS`. Do not build `gles_run` for the PS4 here; whether it is built on the PS4 is part of the hardware gate. Do not copy the bundle anywhere.
+In `$M/bundle/`: the `true-garden-gpu` tree, the layer-0 weights as `.npz` (`tools/export_layer0_npz.py`, so the PS4 needs only numpy), the real-weight dumps for the fixture tokens, and a `SHA256SUMS`. Do not build `gles_run` for the PS4 here; whether it is built on the PS4 is part of the hardware gate. Do not copy the bundle anywhere.
 
 ## Report back
 

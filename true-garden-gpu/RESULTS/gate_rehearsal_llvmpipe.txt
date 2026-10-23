@@ -1,10 +1,10 @@
-# tools/gpu022_gate.sh rehearsal on LLVMPipe (ALLOW_SOFTWARE=1), cloud container, 2026-10-23. NOT a hardware run.
-# stop-path checks: wrong boot id -> exit 2 (HOLD); llvmpipe without ALLOW_SOFTWARE -> HOLD 'software renderer'
-[20:40:08] --- preflight: boot 5f3abad8-67a4-42e3-ad33-37fb61199c89 kernel 6.18.44-fc-v153
-[20:40:08]     D-state: 
-[20:40:08]     max temp C:   load: 0.33 0.47 0.66  mem avail MB: 15390
-[20:40:08] steps ABC, timeout 120s per dispatch, wrapper 'none'
-[20:40:08] === A: compile only
+# tools/gpu022_gate.sh rehearsal on LLVMPipe (ALLOW_SOFTWARE=1, D_ALLOW='mmc|sdio', weights as .npz, gguf-py not importable), cloud container, 2026-10-23. NOT a hardware run.
+# stop-path checks (earlier run): wrong boot id -> exit 2 (HOLD); llvmpipe without ALLOW_SOFTWARE -> HOLD 'software renderer'; D-state filter unit-checked: user process HOLD, ttm/GPU kthread HOLD, unexplained kthread HOLD, mmc kthread ok only with D_ALLOW
+[20:52:57] --- preflight: boot 5f3abad8-67a4-42e3-ad33-37fb61199c89 kernel 6.18.44-fc-v153
+[20:52:57]     D-state: 
+[20:52:57]     max temp C:   load: 0.11 0.16 0.35  mem avail MB: 15466
+[20:52:57] steps ABC, timeout 120s per dispatch, wrapper 'none'
+[20:52:57] === A: compile only
 ggml_eltwise.comp          compiled OK; local size 64x1x1; GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS 1024
 ggml_fa_f16.comp           compiled OK; local size 128x1x1; GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS 1024
 ggml_matvec_qk.comp        compiled OK; local size 64x1x1; GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS 1024
@@ -14,7 +14,7 @@ ggml_rope_neox.comp        compiled OK; local size 64x1x1; GL_MAX_COMPUTE_WORK_G
 unit_exact_lib.comp        compiled OK; local size 64x1x1; GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS 1024
 RESULT: PASS
 GL_RENDERER: llvmpipe (LLVM 20.1.2, 256 bits) | GL_VERSION: OpenGL ES 3.2 Mesa 25.2.8-0ubuntu0.24.04.4
-[20:40:09] === B: helper exactness
+[20:52:57] === B: helper exactness
 f16r (f32->f16 RNE->f32)           n=   275346 mismatches=0
 glibc_expf on [-87.3, 4]           n=    73730 mismatches=0 (known class: glibc not correctly rounded, port is: 0)
 rcp_cr on [1, 4096]                n=    73728 mismatches=0
@@ -23,20 +23,19 @@ sqrt_cr on [1e-12, 1e8]            n=    65536 mismatches=0
 ggml silu on [-20, 20]             n=    81920 mismatches=0
 rms_norm*w (4096 rows x 1024)      n=  4194304 mismatches=0
 RESULT: PASS (expf known-class mismatches are listed above and are not counted)
-[20:40:11] === C: layer 0, model s1, dump s1_fa1_t1
+[20:52:59] === C: layer 0, model s1, dump s1_fa1_t1
 step0 n_kv=  1 l_out BITEXACT ndiff=0 first differing stage: none
 step1 n_kv=  2 l_out BITEXACT ndiff=0 first differing stage: none
 RESULT: PASS (2 steps x 17 stages)
-[20:40:15] === C: layer 0, model s2, dump s2_fa1
+[20:53:03] === C: layer 0, model s2, dump s2_fa1
 step0 n_kv=  1 l_out BITEXACT ndiff=0 first differing stage: none
 step1 n_kv=  2 l_out BITEXACT ndiff=0 first differing stage: none
 step2 n_kv=  3 l_out BITEXACT ndiff=0 first differing stage: none
 step3 n_kv=  4 l_out BITEXACT ndiff=0 first differing stage: none
 step4 n_kv=  5 l_out BITEXACT ndiff=0 first differing stage: none
 RESULT: PASS (5 steps x 17 stages)
-[20:40:24] GATE RESULT: PASS for steps ABC
-[20:40:24] --- aftercare: boot 5f3abad8-67a4-42e3-ad33-37fb61199c89 kernel 6.18.44-fc-v153
-[20:40:24]     D-state: 
-[20:40:24]     max temp C:   load: 0.48 0.49 0.67  mem avail MB: 15283
-[20:40:24] outputs: $SCRATCH/bundle/gate-out-20261023T204008Z
-exit 0
+[20:53:12] GATE RESULT: PASS for steps ABC
+[20:53:12] --- aftercare: boot 5f3abad8-67a4-42e3-ad33-37fb61199c89 kernel 6.18.44-fc-v153
+[20:53:12]     D-state: 
+[20:53:12]     max temp C:   load: 0.31 0.20 0.36  mem avail MB: 15166
+[20:53:12] outputs: $SCRATCH/bundle/gate-out-20261023T205257Z

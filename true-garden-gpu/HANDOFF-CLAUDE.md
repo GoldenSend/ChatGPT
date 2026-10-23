@@ -64,7 +64,7 @@ PASS: `RESULT: PASS`. FAIL is a valid result (the driver is not IEEE in some pat
 
 ### C. Layer 0 chained on Liverpool
 ```sh
-export LLAMA_CPP=$PWD/llama-gguf WORKDIR=$PWD/work-c          # bundle holds llama-gguf/gguf-py
+export WORKDIR=$PWD/work-c          # weights as .npz from tools/export_layer0_npz.py (numpy only)
 MODEL=/home/goldensend/ps4-llm-test/Qwen3-0.6B-Q4_K_M.gguf    # sha256sum must print b0638f08... first
 python3 TESTS/test_gles_layer_vs_oracle.py tools/gles_run_guarded.sh $MODEL dumps/real_fixture | tee step-c.txt
 ```

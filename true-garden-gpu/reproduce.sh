@@ -4,6 +4,8 @@
 # Never touches a PS4. Takes ~10 minutes on 4 cores (mostly the llama.cpp build).
 #
 #   WORK=/some/scratch/dir ./reproduce.sh
+#   SKIP_GLES=1: no EGL/GLES headers here; build the oracle, models and dumps and
+#   run the CPU-only tests, skip gles_run and every GPU test.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -27,7 +29,7 @@ B="$LLAMA_CPP/build-jaguar/bin"
 # 2. tools
 g++ -O2 -march=btver2 -std=c++17 -I"$LLAMA_CPP/include" -I"$LLAMA_CPP/ggml/include" "$HERE/tools/dump_layer0.cpp" \
     -L"$B" -lllama -lggml -lggml-base -lggml-cpu -Wl,-rpath,"$B" -o "$WORK/bin/dump_layer0"
-gcc -O2 -o "$WORK/bin/gles_run" "$HERE/tools/gles_run.c" -lEGL -lGLESv2
+[ "${SKIP_GLES:-0}" = 1 ] || gcc -O2 -o "$WORK/bin/gles_run" "$HERE/tools/gles_run.c" -lEGL -lGLESv2
 
 # 3. synthetic Qwen3-0.6B-shaped 1-layer models (deterministic; hashes in BASELINE.md)
 for s in 1 2 3; do
@@ -55,6 +57,7 @@ DD="$WORK/dumps"
 python3 "$HERE/TESTS/test_emu_vs_oracle.py" "$M/synth-q4km-s1.gguf" "$DD/s1_fa1_t1" 17 301 | tail -1
 python3 "$HERE/TESTS/test_emu_vs_oracle.py" "$M/synth-q4km-s2.gguf" "$DD/s2_fa1" 5 77 300 411 9 | tail -1
 python3 "$HERE/TESTS/test_emu_vs_oracle.py" "$M/synth-q4km-s3.gguf" "$DD/s3_fa1" 499 0 1 2 | tail -1
+if [ "${SKIP_GLES:-0}" != 1 ]; then
 python3 "$HERE/TESTS/test_gles_exact_lib.py" "$G" "$WORK" | tail -1
 python3 "$HERE/TESTS/test_gles_fa_vs_oracle.py" "$G" "$DD/s1_fa1_t1" "$DD/s2_fa1" "$DD/s3_fa1" "$DD/s1_long" | tail -1
 expect_fail python3 "$HERE/TESTS/test_gles_fa_vs_oracle.py" --negative-control "$G" "$DD/s1_fa1_t1" "$DD/s2_fa1" "$DD/s3_fa1" "$DD/s1_long"
@@ -64,6 +67,9 @@ for m in "s1 s1_fa1_t1" "s2 s2_fa1" "s3 s3_fa1" "s1 s1_long"; do
     python3 "$HERE/TESTS/test_gles_layer_vs_oracle.py" "$G" "$M/synth-q4km-$1.gguf" "$DD/$2" | tail -1
 done
 expect_fail python3 "$HERE/TESTS/test_gles_matvec_vs_oracle.py" --negative-control "$G" "$M/synth-q4km-s1.gguf" "$DD/s1_fa1_t1"
+else
+echo "SKIP_GLES=1: GPU tests not run"
+fi
 python3 "$HERE/experiments/sensitivity.py" "$WORK/sensitivity.json" "$M/synth-q4km-s1.gguf" "$M/synth-q4km-s2.gguf" "$M/synth-q4km-s3.gguf" > /dev/null
 python3 "$HERE/experiments/summarize_sensitivity.py" "$WORK/sensitivity.json" "$WORK/sensitivity_summary.md"
 echo "sensitivity summary: $WORK/sensitivity_summary.md"
