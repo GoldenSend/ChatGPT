@@ -16,10 +16,15 @@
 #      the GPU-021 runner did; unset = EGL surfaceless), MESA_WRAPPER (optional
 #      launcher), GLES_TIMEOUT (s per dispatch, default 120), TEMP_MAX (C,
 #      default 75), D_ALLOW (regex of kernel-thread names/wait channels allowed
-#      in D state because the preflight showed them unrelated to GPU and
-#      storage, e.g. 'mmc|sdio'; default none), ALLOW_SOFTWARE=1 (rehearsal on
-#      LLVMPipe only), GATE_RECORD=1 (bundle build only: replay without comparing)
-# Stops on the first problem. Nothing is retried.
+#      to stay in D state because the preflight showed them unrelated to GPU and
+#      storage; default none), DMESG_IGNORE (regex of kernel-log lines known from
+#      the preflight to be unrelated, e.g. '\] mmc0: '; default none),
+#      ALLOW_SOFTWARE=1 (rehearsal on LLVMPipe only), GATE_RECORD=1 (bundle
+#      build only: replay without comparing)
+# D state: a process counts only if it is in D in all of 5 samples 1 s apart
+# (short D waits for journal commits and writeback on the USB root are normal).
+# Stops on the first problem. Nothing is retried. A HOLD before step A means
+# nothing touched the GPU.
 # Exit 0 = every requested step PASS; 2 = HOLD (safety); 4 = FAIL (numerics).
 set -u
 EXPECTED=${1:?expected boot id}; STEPS=${2:?steps}
@@ -42,25 +47,37 @@ aftercare() {
     (cd "$RUN" && find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS)
     log "outputs: $RUN"
 }
-hold() { log "HOLD: $*"; aftercare; exit 2; }
+STARTED=0
+hold() { [ "$STARTED" = 1 ] || set -- "$*" "(before step A: nothing touched the GPU)"; log "HOLD: $*"; aftercare; exit 2; }
 fail() { log "RESULT: FAIL $*"; aftercare; exit 4; }
+dstuck() {  # processes in D state in every one of 5 samples, 1 s apart
+    local f="$RUN/dstate-samples.txt" i
+    : > "$f"
+    for i in 1 2 3 4 5; do
+        ps -eo pid,ppid,stat,wchan:32,comm | awk 'NR > 1 && $3 ~ /^D/' >> "$f"
+        [ "$i" = 5 ] || sleep 1
+    done
+    awk '{ n[$1]++; l[$1] = $0 } END { for (p in n) if (n[p] == 5) print l[p] }' "$f"
+}
+newdmesg() {  # kernel-log lines newer than the last one before the gate started
+    dmesg 2>/dev/null | awk -v t0="$DMESG_T0" '
+        match($0, /^\[ *[0-9]+\.[0-9]+\]/) { ts = substr($0, 2, RLENGTH - 2) + 0 }
+        ts > t0 + 0'
+}
 health() {  # safety stop conditions
     [ "$(cat /proc/sys/kernel/random/boot_id)" = "$EXPECTED" ] || hold "boot id is not the pinned one"
-    # Any user process in D state stops the gate. A kernel thread (parent 2) in D state
-    # stops it unless its name or wait channel matches D_ALLOW, and never when it
-    # looks GPU- or storage-related.
-    local d; d=$(ps -eo pid,ppid,stat,wchan:32,comm | awk -v allow="${D_ALLOW:-}" '
-        NR > 1 && $3 ~ /^D/ {
+    # A process stuck in D state stops the gate if it is a user process, looks
+    # GPU- or storage-related, or is a kernel thread that D_ALLOW does not match.
+    local d; d=$(dstuck | awk -v allow="${D_ALLOW:-}" '
+        {
             gs = ($4 $5) ~ /amdgpu|radeon|drm|ttm|fence|gfx|sdma|ring|gpu|kgd|usb|scsi|blk|jbd2|ext4|flush|ata/
             if ($2 != 2 || gs || allow == "" || ($4 $5) !~ allow) print
         }')
-    [ -z "$d" ] || hold "process in D state: $d"
+    [ -z "$d" ] || hold "process stuck in D state for 4 s or more: $d"
     local t; t=$(maxtemp); [ -z "$t" ] || [ "$t" -le "$TEMP_MAX" ] || hold "temperature ${t} C above ${TEMP_MAX} C"
-    local now; now=$(dmesg 2>/dev/null | wc -l)
-    if [ "$now" -gt "$DMESG0" ]; then
-        local new; new=$(dmesg | tail -n +"$((DMESG0 + 1))" | grep -iE 'gpu|radeon|amdgpu|drm|ring|timeout|fault|hang|error|i/o|reset|usb' || true)
-        [ -z "$new" ] || hold "new kernel messages: $new"
-    fi
+    local new; new=$(newdmesg | { if [ -n "${DMESG_IGNORE:-}" ]; then grep -vE "$DMESG_IGNORE"; else cat; fi; } \
+        | grep -iE 'gpu|radeon|amdgpu|drm|ring|timeout|fault|hang|error|i/o|reset|usb|blocked for more than|hung_task' || true)
+    [ -z "$new" ] || hold "new kernel messages: $new"
 }
 NDISP=0
 run() {  # label shader gles_run-args...
@@ -83,21 +100,28 @@ checkpoint() {  # called by plan_C.sh after every decode step
 }
 
 dmesg > "$RUN/dmesg-before.txt" 2>/dev/null || { echo "cannot read dmesg; run as a user that can"; exit 3; }
-DMESG0=$(wc -l < "$RUN/dmesg-before.txt")
+# new kernel messages are found by timestamp, not line count (the ring buffer may wrap)
+DMESG_T0=$(awk 'match($0, /^\[ *[0-9]+\.[0-9]+\]/) { t = substr($0, 2, RLENGTH - 2) + 0 } END { print t + 0 }' "$RUN/dmesg-before.txt")
 snapshot "preflight"
 health
-log "steps $STEPS, runner $GLES_RUN_BIN, display ${GLES_DRM_DEVICE:-surfaceless}, timeout ${GLES_TIMEOUT}s, wrapper '${MESA_WRAPPER:-none}', D_ALLOW '${D_ALLOW:-}'"
+log "steps $STEPS, runner $GLES_RUN_BIN, display ${GLES_DRM_DEVICE:-surfaceless}, timeout ${GLES_TIMEOUT}s, wrapper '${MESA_WRAPPER:-none}', D_ALLOW '${D_ALLOW:-}', DMESG_IGNORE '${DMESG_IGNORE:-}'"
 if [ "${GATE_RECORD:-0}" != 1 ]; then
     (cd "$B" && sha256sum -c --quiet SHA256SUMS) > "$RUN/bundle-check.txt" 2>&1 || hold "bundle hash mismatch (see bundle-check.txt)"
 fi
+# the GL libraries must load (dlopen only: no device is opened, no context is made)
+${MESA_WRAPPER:+"$MESA_WRAPPER"} python3 -c 'import ctypes, sys
+for n in sys.argv[1:]: ctypes.CDLL(n)' libEGL.so.1 libGLESv2.so.2 ${GLES_DRM_DEVICE:+libgbm.so.1} > "$RUN/libcheck.txt" 2>&1 \
+    || hold "GL libraries do not load: $(tail -1 "$RUN/libcheck.txt")"
+STARTED=1
 
 case "$STEPS" in *A*)
     log "=== A: compile only"
     AMD_DEBUG=cs "$B/tools/compile_check.sh" "$G" > "$RUN/step-a.txt" 2> "$RUN/step-a-stderr.log"
     rc=$?; tee -a "$RUN/gate.log" < "$RUN/step-a.txt"
     grep -m1 GL_RENDERER "$RUN/step-a-stderr.log" | tee -a "$RUN/gate.log"
-    if grep -qiE 'llvmpipe|softpipe|swrast' "$RUN/step-a-stderr.log" && [ "${ALLOW_SOFTWARE:-0}" != 1 ]; then
-        hold "software renderer: this would not test Liverpool"
+    if [ "${ALLOW_SOFTWARE:-0}" != 1 ]; then
+        grep -qiE 'llvmpipe|softpipe|swrast' "$RUN/step-a-stderr.log" && hold "software renderer: this would not test Liverpool"
+        grep -m1 GL_RENDERER "$RUN/step-a-stderr.log" | grep -qi liverpool || hold "renderer is not Liverpool (the GPU-021 runner required it too)"
     fi
     [ $rc = 0 ] || hold "step A failed"
     health ;;

@@ -27,3 +27,5 @@ The tests read layer-0 tensor types from the GGUF, so they work on the real `Qwe
 ## What a PASS means and does not mean
 
 A PASS on LLVMPipe means the shaders implement llama.cpp's arithmetic exactly on an IEEE-conformant driver. It says nothing about Liverpool until `test_gles_exact_lib.py` and the layer test pass on radeonsi on the PS4 under the hardware gate.
+
+`test_gate_stops.sh BUNDLE.tar.gz`: stop-path tests for `tools/gpu022_gate.sh` (16 cases) with stand-ins for `ps`, `dmesg`, the Mesa wrapper and the GL runner. Every HOLD case must exit 2 with its log line, and every allowed case must pass.

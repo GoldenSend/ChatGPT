@@ -31,6 +31,21 @@ cd $M/repo && git pull -q && bash true-garden-gpu/tools/gpu022_preflight.sh 2>&1
 | `~/ps4-llm-test/gpu-022` | does not exist yet |
 | GPU-021 runner and `run-with-mesa24.sh` | tells whether `MESA_WRAPPER` is needed and which DRM node 021 opened |
 
+## Preflight result (2026-10-23 21:27Z, owner's run from the IdeaPad): GO
+
+| Check | Observed (LIVE_OBS via the owner's report) | Decision |
+|---|---|---|
+| Kernel | `5.4.247-DFAUS-blkscrn_Fix_mt7668_hdmia`, stock cmdline | OK |
+| Boot ID | `092d4a88-7f6f-4c4e-a1e3-238d727d6048`, up 1:03 | the pin |
+| Storage | only `sda` (USB 3.2.1 FD, 57.8 GB), root `/dev/sda2` rw, ext4 errors 0; no Hitachi line (not satadiag1) | OK |
+| Worker, temperature, memory, disk | atom-worker active; 49 C; 6644 MB available; 44 GB free | OK |
+| D state | `jbd2/sda2-8`, `flush-8:0` and `events_freezable_power_` kworkers, each in 1 of 10 samples; wait channel not reported (`-`) | normal journal, writeback and disk-event waits on the USB root (INFERENCE). The gate now counts only a process in D for 4 s or more; `D_ALLOW` stays empty |
+| Kernel log | readable; ATAPI `IDENTIFY` failures on `ata1` at 7-49 s (the optical drive, boot only); 937 `mmc0` sdhci timeout lines, the last at 533 s; no USB errors; GPU log only boot-time | `mmc0` is not a block device (no `mmcblk` in `lsblk`), so its lines are ignored (`DMESG_IGNORE`); everything else still stops the gate. New lines are found by timestamp because a log this full can wrap |
+| GPU | `amdgpu` 3.35.0, PCI `1002:9923`, `/dev/dri/renderD128` | OK |
+| GL libraries | none in `/usr/lib/x86_64-linux-gnu`; the opt-in Mesa 24.0.9 runtime `run-with-mesa24.sh` is present | `MESA_WRAPPER` is required, as for GPU-021. The gate checks the libraries load before step A |
+| GPU-021 runner | opened `/dev/dri/renderD128` (GBM) and required `liverpool` in `GL_RENDERER` | same device; the gate now requires `liverpool` too |
+| `~/ps4-llm-test/gpu-022` | absent | OK |
+
 ## Phase 2: what the approval covers
 
 The bundle is `gate/gpu022-bundle.tar.gz` in this folder (sha256 in `CHECKPOINT.json`):
@@ -55,14 +70,15 @@ gpu022/
 
    The gate itself checks every file against `SHA256SUMS` before it starts; a mismatch is a HOLD.
 
-2. **The gate command, run once by the owner.** Typing the boot ID is the boot pin. The lead fills in the bracketed parts from the preflight:
+2. **The gate command, run once by the owner.** Typing the boot ID is the boot pin:
 
    ```sh
    ssh -t ps4-garden 'cd ~/ps4-llm-test/gpu-022/gpu022 && GLES_DRM_DEVICE=/dev/dri/renderD128 \
-     [D_ALLOW=...] [MESA_WRAPPER=...] tools/gpu022_gate.sh <BOOT_ID> ABC'
+     MESA_WRAPPER=/home/goldensend/ps4-mesa2409-runtime-20261011/run-with-mesa24.sh \
+     DMESG_IGNORE="\] mmc0: " tools/gpu022_gate.sh 092d4a88-7f6f-4c4e-a1e3-238d727d6048 ABC'
    ```
 
-   `GLES_DRM_DEVICE` makes the runner open the GPU through GBM and `EGL_PLATFORM_GBM`, the way the GPU-021 runner reached Liverpool.
+   `GLES_DRM_DEVICE` makes the runner open the GPU through GBM and `EGL_PLATFORM_GBM`, the way the GPU-021 runner reached Liverpool; `MESA_WRAPPER` puts the Mesa 24.0.9 runtime's libraries first, as for GPU-021.
 
 | Step | GPU work | Pass condition |
 |---|---|---|
@@ -72,14 +88,15 @@ gpu022/
 
 Every dispatch has a 120 s timeout. The health checks run before A, after A, after B and after every decode step.
 
-**Stop conditions:** the gate halts on the first of these, writes `HOLD` or `FAIL`, runs aftercare and exits. There is no retry.
+**Stop conditions:** the gate halts on the first of these, writes `HOLD` or `FAIL`, runs aftercare and exits. There is no retry. A HOLD before step A says "nothing touched the GPU" (boot pin, bundle hash, health and library checks only).
 - The boot ID differs from the pin (HOLD, exit 2).
 - The bundle hash check fails (HOLD).
-- Any user process is in D state, or a kernel thread in D state looks GPU- or storage-related, or matches nothing in `D_ALLOW` (HOLD).
-- New kernel messages mention the GPU, DRM, the ring, a timeout, a fault, a hang, an I/O error, a reset or USB (HOLD).
+- The GL libraries do not load through `MESA_WRAPPER` (HOLD; `dlopen` only, no device opened).
+- A process stays in D state for 4 s or more (in all of 5 samples 1 s apart) and is a user process, looks GPU- or storage-related, or is a kernel thread `D_ALLOW` does not match (HOLD). Short D waits for journal commits and writeback on the USB root are normal and do not stop it.
+- A kernel-log line newer than the gate's start (by timestamp), not matched by `DMESG_IGNORE`, mentions the GPU, DRM, the ring, a timeout, a fault, a hang, an I/O error, a reset, USB or a blocked task (HOLD).
 - The temperature is above 75 C (HOLD).
 - A dispatch fails or times out (HOLD).
-- Step A reports a software renderer (HOLD).
+- Step A reports a software renderer, or a renderer without `liverpool` in its name (HOLD).
 - An output differs from `expected/` (FAIL, exit 4). The log names the first differing output, its stage and decode step.
 - `dmesg` cannot be read (exit 3, before anything runs).
 
@@ -91,7 +108,7 @@ The owner should also stop it by hand (Ctrl-C) if SSH or Ethernet drops.
 
 **What a PASS would show:** layer 0 of a Qwen3-0.6B-shaped model, 7 decode steps, bit-exact on Liverpool against llama.cpp `23b0202a` (Jaguar flags, flash attention on). It would not show anything about the real weights, full-model inference or speed. The next step after a PASS is the same gate with the real Qwen3-0.6B weights, which needs its own approval.
 
-**Rehearsal (LLVMPipe, cloud, not hardware):** `RESULTS/gate_rehearsal_llvmpipe.txt`. From the final `.tar.gz`, with numpy made unimportable to mirror the PS4: ABC PASS (189 dispatches). The wrong boot ID, a software renderer and a tampered bundle each HOLD (exit 2). A round-toward-zero FP16 conversion FAILs in B at `B1_f16r`, and with C alone it FAILs at decode step 0 (exit 4). The bundle builder first checks 126 of 126 reference-backed outputs bit-exact against llama.cpp and the CPU references.
+**Rehearsal (LLVMPipe, cloud, not hardware):** `RESULTS/gate_rehearsal_llvmpipe.txt`. From the final `.tar.gz`, with numpy made unimportable to mirror the PS4: ABC PASS (189 dispatches). A tampered bundle HOLDs before step A. A round-toward-zero FP16 conversion FAILs in B at `B1_f16r`, and with C alone it FAILs at decode step 0 (exit 4). `TESTS/test_gate_stops.sh` checks 16 stop paths with stand-ins for `ps`, `dmesg`, the wrapper and the runner: brief D waits pass, stuck ones HOLD, `D_ALLOW` cannot excuse storage threads, a GPU fault is caught after the log wraps, `mmc0` lines are ignored only when asked, a missing library or a non-Liverpool renderer HOLDs. The bundle builder first checks 126 of 126 reference-backed outputs bit-exact against llama.cpp and the CPU references.
 
 **Rebuilding the bundle** (needs numpy, gguf-py and Mesa LLVMPipe; the IdeaPad has no numpy):
 

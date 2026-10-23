@@ -1,6 +1,6 @@
 {
  "schema": "true-garden-gpu-checkpoint/1",
- "updated_utc": "2026-10-23T21:35:00Z",
+ "updated_utc": "2026-10-23T21:45:00Z",
  "repo": "GoldenSend/ChatGPT",
  "branch": "claude/project-thread-uovzkj",
  "pull_request": "https://github.com/GoldenSend/ChatGPT/pull/2 (draft)",
@@ -65,7 +65,7 @@
   },
   "gate_rehearsal_llvmpipe": {
    "label": "ARTIFACT_VERIFIED",
-   "result": "replay bundle: 126/126 reference-backed outputs bit-exact vs llama.cpp/CPU refs; ABC PASS (189 dispatches) from the final .tar.gz with numpy unimportable; wrong boot, software renderer, tampered bundle HOLD (exit 2); RTZ FP16 FAIL in B (B1_f16r) and C step 0 (exit 4). LLVMPipe only, NOT hardware",
+   "result": "replay bundle: 126/126 reference-backed outputs bit-exact vs llama.cpp/CPU refs; ABC PASS (189 dispatches) from the final .tar.gz with numpy unimportable; wrong boot, software renderer, tampered bundle HOLD (exit 2); RTZ FP16 FAIL in B (B1_f16r) and C step 0 (exit 4). LLVMPipe only, NOT hardware; TESTS/test_gate_stops.sh 16/16 stop paths behave as specified",
    "file": "RESULTS/gate_rehearsal_llvmpipe.txt"
   }
  },
@@ -78,8 +78,9 @@
   "synth-q4km-s3.gguf": "9116401ebae1279c1bb031eda78293e2dfcf396a11a7313ab816134bb021edf9"
  },
  "file_sha256": {
-  "GATE-GPU-022.md": "489f9a224ca512b7cbd26d93edbf852ef295037d96cf491d029b40cf3a87fd2b",
+  "GATE-GPU-022.md": "37dea1138e770c9910c5f1002f177e5fe0858f66316219dc3df2a1755d82faa6",
   "TESTS/test_emu_vs_oracle.py": "e58ffa6073ed48aa9e8359871308576666242c73ec5b66ea632d5364b26083e7",
+  "TESTS/test_gate_stops.sh": "41d2b3bd09eb3eb7d3761856986b5a9b6ee75d78873b22f3abcce2d8ea96b433",
   "TESTS/test_gles_exact_lib.py": "ea9773f5bdb47e7decc533e8c05217606fcb57a1232113904b637a39cff06674",
   "TESTS/test_gles_fa_vs_oracle.py": "3554f464b7286b6ea0083e09ae22b53502d9efbd065ada38913809f5c34cc96c",
   "TESTS/test_gles_layer_vs_oracle.py": "e7368ed645aa0fd552a07ef5104ec2dca6e3aa69e5fa94fbff854bbe03b996e6",
@@ -105,7 +106,7 @@
   "tools/gles_run.c": "12c21509f7c43dba074378926b3459f81346103690b150a133efa19df65e1cd4",
   "tools/gles_run.py": "15f6ec786840ae1ca585544c19e834e5e36126bddac999a0e42a97df53b80d31",
   "tools/gles_run_guarded.sh": "ac318a30530097076dd6e41593d1f3ade645f8bf8dd500bf6721a3e66c18fbf4",
-  "tools/gpu022_gate.sh": "5d9bc52d5d656574e2d2972c8a276688d067ec41cfc6a211959b5365f0b99c9d",
+  "tools/gpu022_gate.sh": "faf9f87dcc8a9e6863c387081bb0e73959c45f2a9ae4adc26b0e5e84af2d4f4a",
   "tools/gpu022_preflight.sh": "49da684e8a46b049a199811e6661f986fc4fa0b9b0ab67eff4c00a29a7a6deab",
   "tools/make_gate_plan.py": "b5834b1549133fdc94881db29d88e8ad8d0f89f0212ecbe1ca593848a2784c0e",
   "tools/make_synth_qwen3.py": "33b68f0ab5bf3448c3e1971527d32d14ba68ca88d6037e079bc06a09e72c1c09"
@@ -145,12 +146,6 @@
    "label": "USER_REPORTED",
    "what": "IdeaPad has no numpy and no EGL/GLES headers (owner's report 2026-10-23); HANDOFF-CODEX Jobs 1, 2, 4 blocked until the owner provides them",
    "unblock": "owner decision (apt or venv); the synthetic GPU-022 bundle no longer depends on it"
-  },
-  {
-   "id": "ps4_preflight",
-   "label": "UNKNOWN",
-   "what": "PS4 state on the post-power-loss boot not yet read (first preflight never reached the PS4: script bug, fixed)",
-   "unblock": "owner runs tools/gpu022_preflight.sh on the IdeaPad"
   }
  ],
  "residual_risks": [
@@ -161,15 +156,11 @@
  "next_actions": [
   {
    "who": "owner on the IdeaPad",
-   "what": "git pull + tools/gpu022_preflight.sh (read-only), send the report"
+   "what": "git pull, bundle sha check, staging, one gate run on boot 092d4a88 (GATE-GPU-022.md phase 2)"
   },
   {
    "who": "lead",
-   "what": "GO/HOLD from the preflight; write the exact staging + gate command (boot ID, GLES_DRM_DEVICE, D_ALLOW, MESA_WRAPPER)"
-  },
-  {
-   "who": "owner",
-   "what": "staging + one gate run (GATE-GPU-022.md phase 2); send gate.log and gate-out-*"
+   "what": "read gate.log and gate-out-*; offline: run the GPU-021 attention shader against the oracle dumps (NUMERICAL-ANALYSIS section 7)"
   },
   {
    "who": "agy",
@@ -188,10 +179,23 @@
  },
  "gate_bundle": {
   "path": "gate/gpu022-bundle.tar.gz",
-  "sha256": "9962dcd6cce11cde0d5588a0cbe0ebfab94c8786a7325bf52b52666847d877db",
+  "sha256": "aa314a7a973fcbdc60a3b153a4b83c31f1b44b93b89e7ec0245be4f498521091",
   "files": 257,
   "size": "16 MB",
   "content": "plan B 7 dispatches + plan C 182 dispatches (layer 0, 7 decode steps, synth-q4km-s1, dump s1_long), content-addressed inputs, expected/ = verified LLVMPipe replay",
   "ps4_needs": "bash, coreutils, python3 (stdlib), gzip, libEGL.so.1, libGLESv2.so.2, libgbm.so.1"
+ },
+ "preflight_20261023": {
+  "label": "LIVE_OBS (owner's report)",
+  "at": "2026-10-23T21:27:16Z",
+  "decision": "GO",
+  "boot_id": "092d4a88-7f6f-4c4e-a1e3-238d727d6048",
+  "kernel": "5.4.247-DFAUS-blkscrn_Fix_mt7668_hdmia (stock)",
+  "storage": "sda USB 3.2.1 FD 57.8G only; root /dev/sda2 rw; ext4 errors 0; no Hitachi (not satadiag1)",
+  "d_state": "jbd2/sda2-8, flush-8:0, events_freezable_power_ kworkers each in 1 of 10 samples; wchan '-'",
+  "dmesg": "ata1 ATAPI IDENTIFY failures 7-49 s; 937 mmc0 sdhci timeout lines, last at 533 s; no USB errors",
+  "gpu": "amdgpu 3.35.0, PCI 1002:9923, /dev/dri/renderD128",
+  "gl_libs": "none in /usr/lib/x86_64-linux-gnu; Mesa 24.0.9 runtime run-with-mesa24.sh present (MESA_WRAPPER required)",
+  "gate_changes": "D state must persist 4 s; new dmesg lines by timestamp (ring buffer may wrap); DMESG_IGNORE for mmc0; GL library load check before step A; renderer must contain 'liverpool' like the 021 runner"
  }
 }

@@ -1,5 +1,5 @@
-# GPU-022 replay bundle rehearsal on LLVMPipe, cloud container, 2026-10-23T21:20:03Z. NOT a hardware run.
-# bundle gate/gpu022-bundle.tar.gz sha256 9962dcd6cce11cde0d5588a0cbe0ebfab94c8786a7325bf52b52666847d877db; numpy made unimportable (PYTHONPATH shim) to mirror the PS4
+# GPU-022 replay bundle rehearsal on LLVMPipe, cloud container, 2026-10-23T21:38:53Z. NOT a hardware run.
+# bundle gate/gpu022-bundle.tar.gz sha256 aa314a7a973fcbdc60a3b153a4b83c31f1b44b93b89e7ec0245be4f498521091; numpy made unimportable (PYTHONPATH shim) to mirror the PS4
 
 === case pass: steps ABC
 === A: compile only
@@ -18,19 +18,8 @@ COMPARE C: PASS, 182 outputs bit-exact
 GATE RESULT: PASS for steps ABC (189 dispatches)
 exit 0
 
-=== case wrongboot: steps ABC
-HOLD: boot id is not the pinned one
-exit 2
-
-=== case nosoftware: steps ABC
-=== A: compile only
-RESULT: PASS
-GL_RENDERER: llvmpipe (LLVM 20.1.2, 256 bits) | GL_VERSION: OpenGL ES 3.2 Mesa 25.2.8-0ubuntu0.24.04.4
-HOLD: software renderer: this would not test Liverpool
-exit 2
-
 === case tamper: steps ABC
-HOLD: bundle hash mismatch (see bundle-check.txt)
+HOLD: bundle hash mismatch (see bundle-check.txt) (before step A: nothing touched the GPU)
 exit 2
 
 === case rtzB: steps ABC
@@ -52,10 +41,29 @@ COMPARE C: FAIL, 15 of 26 outputs differ; first: C0_12_kpack
 RESULT: FAIL at decode step 0 (first differing output above)
 exit 4
 
+=== TESTS/test_gate_stops.sh (stand-ins for ps, dmesg, the Mesa wrapper and the GL runner)
+ok   baseline A: exit 0
+ok   jbd2 in D 2 of 3 samples: exit 0
+ok   jbd2 stuck in D: exit 2
+ok   user process stuck in D: exit 2
+ok   unexplained kthread stuck: exit 2
+ok   kthread stuck, D_ALLOW matches: exit 0
+ok   storage kthread, D_ALLOW tries: exit 2
+ok   GPU fault after ring-buffer wrap: exit 2
+ok   mmc0 timeout, not ignored: exit 2
+ok   mmc0 timeout, DMESG_IGNORE: exit 0
+ok   GPU fault, DMESG_IGNORE for mmc0: exit 2
+ok   GL libraries do not load: exit 2
+ok   software renderer: exit 2
+ok   hardware renderer, not Liverpool: exit 2
+ok   Liverpool renderer: exit 0
+ok   wrong boot id: exit 2
+RESULT: PASS (16 ok, 0 wrong)
+
 # bundle build log (tools/build_gate_bundle.sh, model synth-q4km-s1, dump s1_long, 7 steps)
 plan: B 7 dispatches, C 182 dispatches over 7 steps; 52 input files
 replay vs references (llama.cpp tensors for layer 0, CPU references for helpers): 126/126 bit-exact
 GL_RENDERER: llvmpipe (LLVM 20.1.2, 256 bits) | GL_VERSION: OpenGL ES 3.2 Mesa 25.2.8-0ubuntu0.24.04.4
 COMPARE B: PASS, 7 outputs bit-exact
-[21:19:31] GATE RESULT: PASS for steps ABC (189 dispatches)
-bundle: /home/user/ChatGPT/true-garden-gpu/gate/gpu022-bundle.tar.gz (16M), 257 files, sha256 9962dcd6cce11cde0d5588a0cbe0ebfab94c8786a7325bf52b52666847d877db
+[21:36:53] GATE RESULT: PASS for steps ABC (189 dispatches)
+bundle: /home/user/ChatGPT/true-garden-gpu/gate/gpu022-bundle.tar.gz (16M), 257 files, sha256 aa314a7a973fcbdc60a3b153a4b83c31f1b44b93b89e7ec0245be4f498521091
