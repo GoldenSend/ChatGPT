@@ -80,7 +80,7 @@ Reading:
 2. **Matvec reduction order is second.** ggml's AVX Q4_K/Q6_K dot keeps 8 float lanes (plus a separate 4-lane mins accumulator for Q4_K) and reduces them in a fixed tree. A row-serial GPU kernel differs in the last bit on 70-90% of rows (`RESULTS/gles_matvec_vs_oracle.txt`, negative control). That is exactly the "token 0 projection differs at the last bit" observation on record (`USER_REPORTED`), and it fails token 1 half the time through the attention path.
 3. **"More precise" is not "matching".** The all-precise variant, where every op is at least as accurate as ggml, still fails token 1 every time. The target has to be ggml's *sequence*, not accuracy.
 
-## 7. What this says about the current hardware runner (`INFERENCE`, runner source not available here)
+## 7. What this says about the current hardware runner (`INFERENCE`, then the 021 attention shader itself)
 
 The 021b result (RNE packs, deterministic exp, correct reciprocal, still 573/1024) is what section 6 predicts if at least one of these is still true of the runner. They are ordered by how often each one failed token 1 offline:
 
@@ -88,6 +88,31 @@ The 021b result (RNE packs, deterministic exp, correct reciprocal, still 573/102
 2. The Q/K/V/O matvecs use a different float reduction order than ggml's 8 AVX lanes.
 3. RMSNorm accumulates in fp32 rather than emulating ggml's double sum.
 4. RoPE evaluates sin/cos on the GPU.
+
+### 7.1 The GPU-021 attention shader, read (2026-10-23)
+
+The owner's read-only preflight printed `attn_two_token_gqa.comp` from `021-BUNDLE.tar` (transcribed to `experiments/gpu021/attn_two_token_gqa.comp`; not hash-verified). It already does what item 1 asks for: FP16 Q (`hround(q)`), FP16 K/V from the cache, the online max with `hround(x*e0)+y` when the second score is larger and `x+y*e1` otherwise, an FP16 accumulator rounded once, a correctly rounded reciprocal of `e0+e1`, and `precise` everywhere. It differs from ggml FA in three places:
+
+- **the KQ dot product is summed in index order** (`score += hround(q[j]) * k[j]`, j = 0..127), while `ggml_vec_dot_f16` uses 4 accumulators x 8 lanes and a fixed reduction;
+- `exp` is a double-float Taylor series (near-correctly rounded), not glibc `expf`;
+- the scale is the literal `0.08838834764831845` (which rounds to the same fp32 value as ggml's `1/sqrtf(128)`).
+
+`experiments/gpu021/run_attention.py` runs that shader on LLVMPipe with Q/K/V from the bit-exact emulator (`ARTIFACT_VERIFIED`, `RESULTS/gpu021_attention.json`, 3 synthetic models x 40 token pairs):
+
+| | Result |
+|---|---|
+| token 0 (n_kv = 1) | bit-exact in 120/120 (it returns f16(V), section 4) |
+| token 1 (n_kv = 2), attention output | differs in 120/120 cases, 251 to 1466 of 2048 values |
+| ggml FA with only the in-order KQ dot | reproduces the shader's difference count in 120/120 |
+| ggml FA with only the near-correctly rounded exp | differs in 1/120 |
+| ggml FA with only the literal scale | differs in 0/120 |
+| layer output when only the attention is 021's | changes in 111/120: in 13 cases at least 989 of 1024 values move by more than 1e-5 (a Q8_K code flipped at the O-projection input); in the other 98 only low bits change (max 2.9e-06), which later layers can amplify |
+
+So the KQ summation order alone is enough to break token 1, independent of the hardware. It is item 1 of the list above in a narrower form than expected: the softmax and accumulator semantics were right, the dot-product lane order was not. The 021 matvec (`attn_q4k_q8k_avx_order.comp`, key lines only) appears to follow ggml's 8-lane AVX order with `hsum_float_8`, which could not be checked line by line from the excerpt.
+
+### 7.2 Liverpool arithmetic seen in GPU-022 (2026-10-23, `LIVE_OBS` via the owner)
+
+On radeonsi (Mesa 24.0.9, LLVM 19.1.7), the integer FP16 RNE, the glibc expf port, the correctly rounded rcp and sqrt, SiLU and the double-float RMSNorm are bit-exact on the GPU-022 inputs. `ggml_v_expf` differs in 4775 of 73728 values: fp32 denormals are flushed (an FTZ replay of the shader predicts exactly that count and the first index, `RESULTS/ftz_model.txt`), only for inputs at or below -81.1. In layer 0 that function feeds only SiLU, where it cannot matter, and offline layer 0 with FTZ in both exp functions stays bit-identical (3780/3780 stage outputs).
 
 **Smallest missing input:** the 021 runner's shader sources and the script that produced its CPU oracle (see section 9). With those, `experiments/sensitivity.py` can be pointed at the runner's actual arithmetic instead of these generic variants.
 
@@ -119,7 +144,7 @@ Results on Mesa 25.2.8 LLVMPipe:
 
 ### Residual risks before any hardware claim
 
-- **Liverpool/radeonsi is untested.** LLVMPipe is IEEE with denormals; radeonsi may flush fp32 denormals and may implement `/`, `sqrt` and `exp` approximately. The correctly-rounded helpers search +-2 or +-3 ulps around the hardware result, so they tolerate approximate rcp/sqrt, but denormal flushing and whether `precise` really stops `v_mad`/`v_fma` contraction need a radeonsi run (`TESTS/test_gles_exact_lib.py` is the probe) or an offline ISA dump.
+- **Liverpool/radeonsi, partly tested (GPU-022, section 7.2).** All 7 shaders compile; the helpers are bit-exact except where fp32 denormals are flushed (FTZ), which the layer-0 path absorbs. Whether `precise` stops `v_mad`/`v_fma` contraction inside the full layer is answered only by part C.
 - **expf ~4e-7 per call** (see table above). One call per head per KV step. A software-fp64 port would remove it.
 - **RMSNorm** uses a ~48-bit double-float in place of ggml's 53-bit double; it can differ when the exact sum of squares sits within ~2^-47 of a float midpoint. No mismatches in 4096 stress rows.
 - **Oracle provenance (section 9).**
