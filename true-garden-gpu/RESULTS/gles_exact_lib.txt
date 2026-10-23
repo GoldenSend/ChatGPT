@@ -1,0 +1,5 @@
+# GLSL helpers vs CPU reference on 2026-10-23T20:12:14Z
+f16r (f32->f16 RNE->f32)           n=  4404114 mismatches=0
+glibc_expf on [-87.3, 4]           n=  4718594 mismatches=2 (known class: glibc not correctly rounded, port is: 2)
+rcp_cr on [1, 4096]                n=  4718592 mismatches=0
+RESULT: PASS (expf known-class mismatches are listed above and are not counted)
