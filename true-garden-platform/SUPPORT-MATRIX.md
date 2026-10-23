@@ -22,7 +22,8 @@ Stack: Debian 13, kernel `5.4.247-DFAUS-blkscrn_Fix_mt7668_hdmia` (PNY bzImage s
 |---|---|---|
 | amdgpu kernel driver, render node `/dev/dri/renderD128` | `PROVEN` (LIVE_OBS 10-23) | amdgpu 3.35.0 bound to 1002:9923, card0 + renderD128; earlier runs dispatched (`USER_REPORTED`) |
 | System GL/EGL/GLES/GBM libraries | `BLOCKED` (by design) | LIVE_OBS 10-23: none in `/usr/lib/x86_64-linux-gnu`. Hardware GL only through the opt-in runtime `run-with-mesa24.sh` (needs render-group access) |
-| OpenGL ES 3.2 compute (radeonsi, isolated Mesa 24.0.9) | `PARTIAL` | Q4_K canary 1024/1024; Hybrid 003/004 logits bit-identical; layer 0 token 0 7/7; **token 1 573/1024 bad** (GPU-021b). Numerically incorrect for multi-token today (`USER_REPORTED`) |
+| fp32 denormals in compute shaders | `HW/STACK-LIMITED` (LIVE_OBS 10-23, GPU-022) | radeonsi flushes fp32 denormals in compute, confirmed bit for bit; CPU (SSE) keeps them. Exact-match shaders must avoid or emulate denormals |
+| OpenGL ES 3.2 compute (radeonsi, isolated Mesa 24.0.9) | `PARTIAL` (works on hardware, LIVE_OBS 10-23: GL_RENDERER "AMD Radeon Graphics (radeonsi, liverpool, LLVM 19.1.7, DRM 3.35, 5.4.247-DFAUS…)" with GBM on renderD128) | Q4_K canary 1024/1024; Hybrid 003/004 logits bit-identical; layer 0 token 0 7/7; **token 1 573/1024 bad** (GPU-021b). Numerically incorrect for multi-token today (`USER_REPORTED`) |
 | Bit-exact ggml-matching compute shaders | `PASS_OFFLINE` only | PR #2, LLVMPipe, synthetic weights; GPU-022 pending (`ARTIFACT_VERIFIED` offline) |
 | Desktop OpenGL (GL 4.6 radeonsi) | `EXTERNAL` | Baikal consoles with patched Mesa (Linux psX, issue #2). Not tried here; True Garden runs headless |
 | Vulkan (RADV) | `BLOCKED` | here: historical process exit 137 (SIGKILL, likely OOM) (`USER_REPORTED`). Elsewhere: RADV smoke tests pass on Baikal, but Linux psX rolled back a system Mesa because of Vulkan GPU-completion stalls and an HTILE hang (`PUBLIC_CLAIM`). Not production-safe on any PS4 yet |
@@ -112,6 +113,7 @@ Stack: Debian 13, kernel `5.4.247-DFAUS-blkscrn_Fix_mt7668_hdmia` (PNY bzImage s
 | Hardware watchdog | `UNKNOWN` (P10) | the loader runs a watchdog thread in Orbis only before kexec (`PUBLIC_CLAIM`) |
 | Remote recovery | `BLOCKED` | needs the owner at the console; no out-of-band management |
 | Boot diagnostics | `PARTIAL` | dmesg/journal after boot. LIVE_OBS 10-23: `wchan` reads "-" for every D task on this kernel, so hang diagnosis needs `/proc/PID/stack` (root). The kernel log is big enough that line-count checks miss lines after the ring wraps; compare by timestamp. UART needs soldering (`PUBLIC_CLAIM`) |
+| Hung-task detection | `BLOCKED` (LIVE_OBS 10-23) | this kernel has no hung-task detector, and the USB root's write-back kworker can sit in D state for 4+ s on small writes. Health checks must judge stalls by block I/O progress (`/sys/block/sdX/stat`), not by D-state alone |
 | Root I/O waits under load | `PROVEN` normal (LIVE_OBS 10-23) | jbd2/sda2-8, flush-8:0 and an events_freezable_power_ kworker each in D state in 1 of 10 samples over 20 s with atom-worker active: short I/O waits, not hangs (`INFERENCE`) |
 | Unplanned power-loss survival | `PROVEN` once | 2026-10-23: relaunch worked, ext4 errors 0 (`USER_REPORTED`) |
 
