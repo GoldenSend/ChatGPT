@@ -22,7 +22,8 @@ Offline engineering for running Qwen3 layer 0 on the PS4 Liverpool GPU (GLES 3.2
 | `RESULTS/` | committed outputs of every test |
 | `shaders/` | ggml-exact GLSL ES 3.2 compute shaders plus a shared library |
 | `emu/` | bit-exact numpy emulator of the Jaguar ggml kernels; glibc `expf` models |
-| `tools/` | synthetic model writer, llama.cpp tensor dumper, headless GLES runner |
+| `tools/` | synthetic model writer, llama.cpp tensor dumper, headless GLES runners (`gles_run.c`, and `gles_run.py` for machines without a compiler), GPU-022 plan builder, gate, comparator and read-only preflight |
+| `gate/` | `gpu022-bundle.tar.gz`: the replay bundle the PS4 runs (built and rehearsed in the cloud; sha256 in `CHECKPOINT.json`) |
 | `experiments/` | the sensitivity study (one GPU-style deviation at a time) |
 | `reproduce.sh` | rebuilds every result from scratch |
 | `HANDOFF-CODEX.md`, `HANDOFF-CLAUDE.md`, `HANDOFF-AGY.md` | next work per agent (the Codex file is written for agy or opencode to run, since Codex usage ran out) |

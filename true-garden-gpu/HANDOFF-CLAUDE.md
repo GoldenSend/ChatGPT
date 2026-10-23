@@ -21,56 +21,20 @@ Hard limits (unchanged): no PS4 boot, reboot, payload send, storage write, kerne
 4. **radeonsi behaviour without hardware.** Read Mesa 24.x radeonsi/ACO or LLVM AMDGPU source for: fp32 denormal mode for compute on gfx7, whether `precise` (NIR `exact`) blocks `v_mad_f32`/`v_fma_f32` formation, and how `/` and `sqrt` lower. On GCN, `v_mad_f32` rounds like a separate multiply and add but does not support denormals, and `v_fma_f32` is fused; either one inside a `precise` path (fused, or with denormal operands) would break exactness.
 5. **Speed.** Matvec as one workgroup per row with ggml's 8-lane assignment and a fixed reduce order; fuse Q8_K quantization with RMSNorm; batch all dispatches of a step into one context instead of one process per op. See `PERFORMANCE.md`: the 46 ms per layer on record is probably overhead, so profile before optimizing arithmetic.
 
-## 3. GPU-022 hardware qualification gate (DRAFT, needs explicit owner approval)
+## 3. GPU-022 hardware qualification gate (synthetic weights: APPROVED 2026-10-23 20:42Z)
 
-**Executable form: `GATE-GPU-022.md` and `tools/gpu022_gate.sh`** (synthetic weights first, rehearsed on LLVMPipe). The steps below are the general design; where they differ, the gate file wins. Real weights come in a second gate after a PASS.
+**The exact operation is `GATE-GPU-022.md`.** The owner approved it once (stock kernel, one attempt, no retry, boot ID pinned by the owner). The bundle `gate/gpu022-bundle.tar.gz` is built in the cloud by `tools/build_gate_bundle.sh`: a fixed dispatch plan, content-addressed inputs and LLVMPipe-verified expected outputs. The PS4 replays it with `tools/gles_run.py` (ctypes, GBM like the 021 runner) and compares with `tools/gate_compare.py` (standard library only), so it needs no numpy, compiler or headers. The owner runs the read-only preflight (`tools/gpu022_preflight.sh`), staging and the gate; the lead decides GO or HOLD from the preflight and writes the exact gate command (boot ID, `GLES_DRM_DEVICE`, `D_ALLOW`, `MESA_WRAPPER`).
 
 Purpose: find out whether radeonsi on Liverpool reproduces the offline result. It is a qualification of the shader arithmetic, not a speed test and not production use.
 
-**Approval wording to request:** "Approve GPU-022 steps A to C on the stock kernel, one attempt, HOLD on any stop condition." Approval covers this session only. Every step stops the whole gate on any stop condition; no retries inside the session.
+### After a PASS: the real-weights gate (needs its own approval)
+Same builder, real inputs: `LLAMA_CPP=... tools/build_gate_bundle.sh Qwen3-0.6B-Q4_K_M.gguf dumps/real_fixture NSTEPS out.tar.gz` on a host with numpy, gguf-py and LLVMPipe (not the IdeaPad today). Preconditions:
+- Section 1 done: real-weight LLVMPipe layer PASS, provenance answered.
+- Real-weight dumps for the fixture tokens come from llama.cpp `23b0202a` with the Jaguar flags (or from the PS4 worker itself, which needs a read-only CPU step on the PS4 in the approval).
+- The model file hash matches the PS4 copy (`b0638f08...`).
+- Owner present for the whole session.
 
-### Preconditions (all must be true before asking)
-- Section 1 done: offline executor results verified by hash, real-weight LLVMPipe layer PASS, provenance answered, bundle `SHA256SUMS` recorded.
-- Real-weight dumps for the fixture tokens come from llama.cpp `23b0202a` with the Jaguar flags (or from the PS4 worker itself; see step C note).
-- Owner present and reachable for the whole session.
-
-### P. Read-only preflight (no GPU work)
-PS4 state is `UNKNOWN` at handoff (last record: 2026-10-14, stock `fc5dc10d`). If the PS4 is off, the **owner** launches Linux with the recorded payload procedure. Then, read-only:
-```sh
-uname -r; cat /proc/sys/kernel/random/boot_id; findmnt -no SOURCE,UUID /
-ps -eo pid,stat,comm | awk '$2 ~ /^D/'            # must print nothing
-cat /sys/class/hwmon/hwmon*/temp*_input 2>/dev/null; free -m
-dmesg --level=err,warn | tail -50                   # no ring timeouts, GPU faults or I/O errors
-ip -br link show eth0; journalctl -u ps4-sky2-carrier-guard -b --no-pager | tail -5
-python3 -c "import numpy; print(numpy.__version__)"  # absent: HOLD (no installs without separate approval)
-```
-Record boot ID; the owner re-pins any boot-ID-pinned script.
-
-### Stage (one disk write, inside the approval)
-Copy the offline bundle to a **new** directory `~/ps4-llm-test/gpu-022/` and `sha256sum -c SHA256SUMS` (any mismatch: HOLD). Build `gles_run` there with the PS4's own gcc against the same libEGL the 021 runner used (Job 3 answer 5); if that Mesa is the isolated `run-with-mesa24.sh` runtime, run every step under it. No system files change.
-
-### A. Compile only (zero dispatches)
-```sh
-AMD_DEBUG=cs tools/compile_check.sh ./gles_run 2> compile-isa.log | tee step-a.txt
-```
-PASS: every shader `compiled OK`, `GL_RENDERER` names the same Liverpool/radeonsi driver as the 021 logs, max invocations >= 256. Keep `compile-isa.log` (ISA, if this Mesa prints it) for the offline audit in section 2.4.
-
-### B. Helper exactness (small dispatches)
-```sh
-export GLES_RUN_BIN=$PWD/gles_run GLES_TIMEOUT=60 WORKDIR=$PWD/work-b
-python3 TESTS/test_gles_exact_lib.py tools/gles_run_guarded.sh $WORKDIR 65536 | tee step-b.txt
-```
-PASS: `RESULT: PASS`. FAIL is a valid result (the driver is not IEEE in some path): record the mismatches, **do not run C**, HOLD, and take the log offline.
-
-### C. Layer 0 chained on Liverpool
-```sh
-export WORKDIR=$PWD/work-c          # weights as .npz from tools/export_layer0_npz.py (numpy only)
-MODEL=/home/goldensend/ps4-llm-test/Qwen3-0.6B-Q4_K_M.gguf    # sha256sum must print b0638f08... first
-python3 TESTS/test_gles_layer_vs_oracle.py tools/gles_run_guarded.sh $MODEL dumps/real_fixture | tee step-c.txt
-```
-Run the 2-token fixture first. Only if it passes, the 48-token dump. PASS on both is the first physical evidence that Liverpool reproduces the PS4 CPU bit for bit for layer 0. FAIL: record the first differing stage per step and HOLD.
-
-Note: if provenance shows the dumps cannot be trusted to equal the PS4 CPU, an extra read-only CPU step is needed (run `dump_layer0` on the PS4 CPU against the worker's own llama.cpp build), which needs its own line in the approval.
+Approval wording to request: "Approve GPU-023 real-weights layer-0 gate on the stock kernel, one attempt, HOLD on any stop condition." The claim after a PASS is exactly: "layer 0, N decode steps, bit-exact on Liverpool against <oracle>".
 
 ### Stop conditions (any one: stop the gate, no retry, report)
 Process in D state; USB/root stall; lost SSH or Ethernet; kernel ring timeout, GPU fault or I/O error in `dmesg`; a `gles_run_guarded.sh` timeout; hash mismatch; changed boot ID; unexpected `GL_RENDERER`; temperature above the 021 aftercare record; anything that makes manual recovery uncertain.

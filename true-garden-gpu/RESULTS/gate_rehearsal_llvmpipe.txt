@@ -1,41 +1,61 @@
-# tools/gpu022_gate.sh rehearsal on LLVMPipe (ALLOW_SOFTWARE=1, D_ALLOW='mmc|sdio', weights as .npz, gguf-py not importable), cloud container, 2026-10-23. NOT a hardware run.
-# stop-path checks (earlier run): wrong boot id -> exit 2 (HOLD); llvmpipe without ALLOW_SOFTWARE -> HOLD 'software renderer'; D-state filter unit-checked: user process HOLD, ttm/GPU kthread HOLD, unexplained kthread HOLD, mmc kthread ok only with D_ALLOW
-[20:52:57] --- preflight: boot 5f3abad8-67a4-42e3-ad33-37fb61199c89 kernel 6.18.44-fc-v153
-[20:52:57]     D-state: 
-[20:52:57]     max temp C:   load: 0.11 0.16 0.35  mem avail MB: 15466
-[20:52:57] steps ABC, timeout 120s per dispatch, wrapper 'none'
-[20:52:57] === A: compile only
-ggml_eltwise.comp          compiled OK; local size 64x1x1; GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS 1024
-ggml_fa_f16.comp           compiled OK; local size 128x1x1; GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS 1024
-ggml_matvec_qk.comp        compiled OK; local size 64x1x1; GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS 1024
-ggml_q8k_quantize.comp     compiled OK; local size 256x1x1; GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS 1024
-ggml_rms_norm_mul.comp     compiled OK; local size 128x1x1; GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS 1024
-ggml_rope_neox.comp        compiled OK; local size 64x1x1; GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS 1024
-unit_exact_lib.comp        compiled OK; local size 64x1x1; GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS 1024
+# GPU-022 replay bundle rehearsal on LLVMPipe, cloud container, 2026-10-23T21:20:03Z. NOT a hardware run.
+# bundle gate/gpu022-bundle.tar.gz sha256 9962dcd6cce11cde0d5588a0cbe0ebfab94c8786a7325bf52b52666847d877db; numpy made unimportable (PYTHONPATH shim) to mirror the PS4
+
+=== case pass: steps ABC
+=== A: compile only
 RESULT: PASS
 GL_RENDERER: llvmpipe (LLVM 20.1.2, 256 bits) | GL_VERSION: OpenGL ES 3.2 Mesa 25.2.8-0ubuntu0.24.04.4
-[20:52:57] === B: helper exactness
-f16r (f32->f16 RNE->f32)           n=   275346 mismatches=0
-glibc_expf on [-87.3, 4]           n=    73730 mismatches=0 (known class: glibc not correctly rounded, port is: 0)
-rcp_cr on [1, 4096]                n=    73728 mismatches=0
-ggml_v_expf on [-100, 100]         n=    73728 mismatches=0
-sqrt_cr on [1e-12, 1e8]            n=    65536 mismatches=0
-ggml silu on [-20, 20]             n=    81920 mismatches=0
-rms_norm*w (4096 rows x 1024)      n=  4194304 mismatches=0
-RESULT: PASS (expf known-class mismatches are listed above and are not counted)
-[20:52:59] === C: layer 0, model s1, dump s1_fa1_t1
-step0 n_kv=  1 l_out BITEXACT ndiff=0 first differing stage: none
-step1 n_kv=  2 l_out BITEXACT ndiff=0 first differing stage: none
-RESULT: PASS (2 steps x 17 stages)
-[20:53:03] === C: layer 0, model s2, dump s2_fa1
-step0 n_kv=  1 l_out BITEXACT ndiff=0 first differing stage: none
-step1 n_kv=  2 l_out BITEXACT ndiff=0 first differing stage: none
-step2 n_kv=  3 l_out BITEXACT ndiff=0 first differing stage: none
-step3 n_kv=  4 l_out BITEXACT ndiff=0 first differing stage: none
-step4 n_kv=  5 l_out BITEXACT ndiff=0 first differing stage: none
-RESULT: PASS (5 steps x 17 stages)
-[20:53:12] GATE RESULT: PASS for steps ABC
-[20:53:12] --- aftercare: boot 5f3abad8-67a4-42e3-ad33-37fb61199c89 kernel 6.18.44-fc-v153
-[20:53:12]     D-state: 
-[20:53:12]     max temp C:   load: 0.31 0.20 0.36  mem avail MB: 15166
-[20:53:12] outputs: $SCRATCH/bundle/gate-out-20261023T205257Z
+=== B: GLSL helpers, 7 dispatches
+COMPARE B: PASS, 7 outputs bit-exact
+=== C: layer 0 chained on the GPU, 182 dispatches
+COMPARE C: PASS, 26 outputs bit-exact
+COMPARE C: PASS, 52 outputs bit-exact
+COMPARE C: PASS, 78 outputs bit-exact
+COMPARE C: PASS, 104 outputs bit-exact
+COMPARE C: PASS, 130 outputs bit-exact
+COMPARE C: PASS, 156 outputs bit-exact
+COMPARE C: PASS, 182 outputs bit-exact
+GATE RESULT: PASS for steps ABC (189 dispatches)
+exit 0
+
+=== case wrongboot: steps ABC
+HOLD: boot id is not the pinned one
+exit 2
+
+=== case nosoftware: steps ABC
+=== A: compile only
+RESULT: PASS
+GL_RENDERER: llvmpipe (LLVM 20.1.2, 256 bits) | GL_VERSION: OpenGL ES 3.2 Mesa 25.2.8-0ubuntu0.24.04.4
+HOLD: software renderer: this would not test Liverpool
+exit 2
+
+=== case tamper: steps ABC
+HOLD: bundle hash mismatch (see bundle-check.txt)
+exit 2
+
+=== case rtzB: steps ABC
+=== A: compile only
+RESULT: PASS
+GL_RENDERER: llvmpipe (LLVM 20.1.2, 256 bits) | GL_VERSION: OpenGL ES 3.2 Mesa 25.2.8-0ubuntu0.24.04.4
+=== B: GLSL helpers, 7 dispatches
+DIFF B1_f16r (stage B1_f16r, step -1): 12031 values differ, first at index 16
+COMPARE B: FAIL, 1 of 7 outputs differ; first: B1_f16r
+RESULT: FAIL in part B (the driver differs from IEEE somewhere); part C not run
+exit 4
+
+=== case rtzC: steps C
+=== C: layer 0 chained on the GPU, 182 dispatches
+DIFF C0_24_ffn_out_q8k (stage ffn_out_q8k, step 0): 310 values differ, first at index 0
+DIFF C0_25_ffn_out (stage ffn_out, step 0): 1024 values differ, first at index 0
+DIFF C0_26_l_out (stage l_out, step 0): 1024 values differ, first at index 0
+COMPARE C: FAIL, 15 of 26 outputs differ; first: C0_12_kpack
+RESULT: FAIL at decode step 0 (first differing output above)
+exit 4
+
+# bundle build log (tools/build_gate_bundle.sh, model synth-q4km-s1, dump s1_long, 7 steps)
+plan: B 7 dispatches, C 182 dispatches over 7 steps; 52 input files
+replay vs references (llama.cpp tensors for layer 0, CPU references for helpers): 126/126 bit-exact
+GL_RENDERER: llvmpipe (LLVM 20.1.2, 256 bits) | GL_VERSION: OpenGL ES 3.2 Mesa 25.2.8-0ubuntu0.24.04.4
+COMPARE B: PASS, 7 outputs bit-exact
+[21:19:31] GATE RESULT: PASS for steps ABC (189 dispatches)
+bundle: /home/user/ChatGPT/true-garden-gpu/gate/gpu022-bundle.tar.gz (16M), 257 files, sha256 9962dcd6cce11cde0d5588a0cbe0ebfab94c8786a7325bf52b52666847d877db
