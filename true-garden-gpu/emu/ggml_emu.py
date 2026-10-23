@@ -411,6 +411,8 @@ def load_weights(gguf_path, llama_cpp=None):
             bsz = 144 if typ == "Q4_K" else 210
             rows = ne[1]
             out[name] = data.view(np.uint8).reshape(rows, ne[0] // QK_K, bsz)
+        elif t.name.startswith("blk.") and not t.name.startswith("blk.0."):
+            continue  # only layer 0 is used; a full 28-layer file may hold other types further up
         else:
             raise ValueError(f"{t.name}: unsupported type {typ}")
         out[name + ".type"] = typ

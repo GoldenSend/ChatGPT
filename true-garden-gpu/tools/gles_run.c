@@ -4,10 +4,12 @@
 //
 // usage: gles_run --src FILE [--src FILE ...] --groups X
 //                 [--in BINDING:PATH ...] [--out BINDING:PATH:BYTES ...]
-//                 [--int NAME=VALUE ...]
+//                 [--int NAME=VALUE ...] [--compile-only]
 // Sources are concatenated after "#version 320 es\n". Input files are
 // uploaded verbatim to SSBO BINDING; outputs are read back after the
 // dispatch. Prints GL_RENDERER so logs say which driver produced a result.
+// --compile-only compiles and links, prints the compute limits, and exits
+// without allocating buffers or dispatching anything (first hardware step).
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 #include <GLES3/gl32.h>
@@ -32,7 +34,7 @@ static char * slurp(const char * path, long * n) {
 
 int main(int argc, char ** argv) {
     const char * srcs[32]; int nsrc = 0;
-    int groups = 1;
+    int groups = 1, compile_only = 0;
     int in_b[MAXB], out_b[MAXB], nin = 0, nout = 0;
     const char * in_p[MAXB]; const char * out_p[MAXB]; long out_n[MAXB];
     const char * int_name[MAXB]; int int_val[MAXB]; int nint = 0;
@@ -40,6 +42,7 @@ int main(int argc, char ** argv) {
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--src")) srcs[nsrc++] = argv[++i];
         else if (!strcmp(argv[i], "--groups")) groups = atoi(argv[++i]);
+        else if (!strcmp(argv[i], "--compile-only")) compile_only = 1;
         else if (!strcmp(argv[i], "--in")) {
             char * s = argv[++i]; char * c = strchr(s, ':'); *c = 0;
             in_b[nin] = atoi(s); in_p[nin++] = c + 1;
@@ -86,6 +89,13 @@ int main(int argc, char ** argv) {
     glAttachShader(prog, sh); glLinkProgram(prog);
     glGetProgramiv(prog, GL_LINK_STATUS, &ok);
     if (!ok) { char log[8192]; glGetProgramInfoLog(prog, sizeof log, NULL, log); fprintf(stderr, "link:\n%s\n", log); return 4; }
+    if (compile_only) {
+        GLint inv, wg[3];
+        glGetIntegerv(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, &inv);
+        glGetProgramiv(prog, GL_COMPUTE_WORK_GROUP_SIZE, wg);
+        printf("compiled OK; local size %dx%dx%d; GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS %d\n", wg[0], wg[1], wg[2], inv);
+        return wg[0] * wg[1] * wg[2] <= inv ? 0 : 7;
+    }
     glUseProgram(prog);
     for (int i = 0; i < nint; i++) glUniform1i(glGetUniformLocation(prog, int_name[i]), int_val[i]);
 

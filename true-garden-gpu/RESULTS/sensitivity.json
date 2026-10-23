@@ -11479,8 +11479,8 @@
   }
  ],
  "models": [
-  "/tmp/claude-0/-home-user-ChatGPT/5fec409f-accf-535a-94a2-336a105b15b5/scratchpad/models/synth-q4km-s1.gguf",
-  "/tmp/claude-0/-home-user-ChatGPT/5fec409f-accf-535a-94a2-336a105b15b5/scratchpad/models/synth-q4km-s2.gguf",
-  "/tmp/claude-0/-home-user-ChatGPT/5fec409f-accf-535a-94a2-336a105b15b5/scratchpad/models/synth-q4km-s3.gguf"
+  "synth-q4km-s1.gguf",
+  "synth-q4km-s2.gguf",
+  "synth-q4km-s3.gguf"
  ]
 }

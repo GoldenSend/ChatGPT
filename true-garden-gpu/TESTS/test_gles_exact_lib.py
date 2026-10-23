@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Run the GLSL helpers (shaders/ggml_exact_lib.glsl) on the current GLES driver and
-compare with the CPU reference: FP16 RNE rounding, glibc expf, correctly rounded 1/x.
+compare with the CPU reference: FP16 RNE rounding, glibc expf, correctly rounded
+1/x and sqrt, ggml_v_expf, SiLU, and ggml's RMSNorm on stress rows with outliers.
+On a new driver (radeonsi) this is the first test to run: it shows whether the
+driver keeps IEEE fp32 behaviour (denormals, no contraction under `precise`).
 
 usage: test_gles_exact_lib.py GLES_RUN_BINARY WORKDIR [N]
 """

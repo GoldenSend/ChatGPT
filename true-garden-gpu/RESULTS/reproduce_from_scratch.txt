@@ -1,0 +1,26 @@
+# reproduce.sh from scratch (fresh models, dumps and tests; llama.cpp build reused from the first run), 2026-10-23, cloud container, Mesa 25.2.8 LLVMPipe
+CMAKE_BUILD_TYPE=Release
+54de976108c35564530add6cd295a4129b4f6edc8a38dacd333e7f752031be63  $WORK/models/synth-f32-s1.gguf
+699b5057081d3bc6885c76c6e25817155aa723df8cad36ea81a9b19108e93213  $WORK/models/synth-f32-s2.gguf
+2e70bf85791efdebdcb670b43a70881900420deccc86a5581999c0c9819170cf  $WORK/models/synth-f32-s3.gguf
+49e72c7497c71994ac5ddaae705f00c215acc072b49e914eaa79380b4cda5f2d  $WORK/models/synth-q4km-s1.gguf
+039a2690a76385798453b246163ee4d12507c59cde80de89df2c56f6aaa5f71b  $WORK/models/synth-q4km-s2.gguf
+9116401ebae1279c1bb031eda78293e2dfcf396a11a7313ab816134bb021edf9  $WORK/models/synth-q4km-s3.gguf
+RESULT: PASS
+RESULT: PASS
+RESULT: PASS
+RESULT: PASS (expf known-class mismatches are listed above and are not counted)
+RESULT: PASS (59 steps)
+negative control, failed as required: RESULT: FAIL (55/59 steps differ) (59 steps)
+RESULT: PASS
+RESULT: PASS (2 steps x 17 stages)
+RESULT: PASS
+RESULT: PASS (5 steps x 17 stages)
+RESULT: PASS
+RESULT: PASS (4 steps x 17 stages)
+RESULT: PASS
+RESULT: PASS (48 steps x 17 stages)
+negative control, failed as required: RESULT: FAIL (14/14 matvecs differ, 0 Q8_K blocks sets differ)
+sensitivity summary: $WORK/sensitivity_summary.md
+ALL OFFLINE CHECKS DONE
+EXIT 0

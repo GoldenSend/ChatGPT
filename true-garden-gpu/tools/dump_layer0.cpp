@@ -6,6 +6,8 @@
 // commit, built with Jaguar-equivalent flags, not a reimplementation.
 //
 // usage: dump_layer0 MODEL.gguf OUTDIR FA(0=off|1=on|2=auto) THREADS TOKEN0 [TOKEN1 ...]
+// Set DUMP_STOP_AFTER=l_out-0 to stop dumping each step after layer 0's output
+// (keeps a 28-layer real-model dump to ~2 MB per step instead of ~60 MB).
 
 #include "llama.h"
 #include "ggml.h"
@@ -22,6 +24,8 @@ struct dump_ctx {
     std::string dir;
     FILE * manifest = nullptr;
     int idx = 0;
+    std::string stop_after;
+    bool done = false;
 };
 
 static bool cb_eval(struct ggml_tensor * t, bool ask, void * ud) {
@@ -29,7 +33,7 @@ static bool cb_eval(struct ggml_tensor * t, bool ask, void * ud) {
     if (ask) {
         return true;
     }
-    if (!ggml_is_contiguous(t)) {
+    if (d->done || !ggml_is_contiguous(t)) {
         return true;
     }
     std::vector<uint8_t> buf(ggml_nbytes(t));
@@ -54,6 +58,9 @@ static bool cb_eval(struct ggml_tensor * t, bool ask, void * ud) {
     }
     fprintf(d->manifest, "\n");
     d->idx++;
+    if (!d->stop_after.empty() && d->stop_after == t->name) {
+        d->done = true;
+    }
     return true;
 }
 
@@ -77,6 +84,7 @@ int main(int argc, char ** argv) {
     if (!model) return 2;
 
     dump_ctx d;
+    if (const char * e = getenv("DUMP_STOP_AFTER")) d.stop_after = e;
     auto cp = llama_context_default_params();
     cp.n_ctx = 256;
     cp.n_batch = 32;
@@ -96,6 +104,7 @@ int main(int argc, char ** argv) {
         mkdir(d.dir.c_str(), 0755);
         d.manifest = fopen((d.dir + "/MANIFEST.tsv").c_str(), "w");
         d.idx = 0;
+        d.done = false;
         llama_token t = toks[s];
         llama_batch b = llama_batch_get_one(&t, 1);
         if (llama_decode(ctx, b) != 0) {

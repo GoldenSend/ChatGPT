@@ -1,0 +1,151 @@
+{
+ "schema": "true-garden-gpu-checkpoint/1",
+ "updated_utc": "2026-10-23T20:45:00Z",
+ "repo": "GoldenSend/ChatGPT",
+ "branch": "claude/project-thread-uovzkj",
+ "pull_request": "https://github.com/GoldenSend/ChatGPT/pull/2 (draft)",
+ "prior_commits": [
+  "0bfe711",
+  "b8c9136"
+ ],
+ "environment": {
+  "where": "isolated cloud container; no PS4, no IdeaPad access",
+  "mesa": "25.2.8 LLVMPipe (LLVM 20.1.2)",
+  "gcc": "13.3.0",
+  "glibc": "2.39",
+  "python": "3.13",
+  "numpy": "2.5.3"
+ },
+ "oracle": {
+  "llama_cpp_commit": "23b0202a189c44a54625aadcb37a946dd1d6278d",
+  "flags": "-march=btver2, AVX+F16C+SSE4.2, no AVX2/FMA, GGML_NATIVE=OFF",
+  "flash_attn": "on (auto resolves to on for CPU; verified)"
+ },
+ "candidate": {
+  "name": "ggml-exact GLSL ES 3.2 layer-0 shader set",
+  "state": "PASS_OFFLINE / HOLD_HARDWARE",
+  "physical_gpu_evidence": "none",
+  "weights": "synthetic Qwen3-0.6B-shaped, 1 layer, seeds 1-3 (real weights not reachable from the cloud)"
+ },
+ "results": {
+  "emu_vs_oracle": {
+   "label": "ARTIFACT_VERIFIED",
+   "result": "PASS, bit-exact, 3 models",
+   "file": "RESULTS/emu_vs_oracle.txt"
+  },
+  "gles_exact_lib": {
+   "label": "ARTIFACT_VERIFIED",
+   "result": "PASS (2 expf cases where glibc misrounds, ~4e-7 rate)",
+   "file": "RESULTS/gles_exact_lib.txt"
+  },
+  "gles_fa_vs_oracle": {
+   "label": "ARTIFACT_VERIFIED",
+   "result": "59/59 steps bit-exact; RTZ negative control 55/59 fail as required",
+   "file": "RESULTS/gles_fa_vs_oracle.txt"
+  },
+  "gles_matvec_vs_oracle": {
+   "label": "ARTIFACT_VERIFIED",
+   "result": "413/413 bit-exact; row-serial negative control 14/14 differ",
+   "file": "RESULTS/gles_matvec_vs_oracle.txt"
+  },
+  "gles_layer_vs_oracle": {
+   "label": "ARTIFACT_VERIFIED",
+   "result": "59 steps x 17 stages bit-exact, whole layer chained on the GPU driver",
+   "file": "RESULTS/gles_layer_vs_oracle.txt"
+  },
+  "sensitivity": {
+   "label": "ARTIFACT_VERIFIED",
+   "result": "attention semantics fail token 1 in 12/12; matvec lane order 6/12; 'all precise' still 12/12",
+   "file": "RESULTS/sensitivity_summary.md"
+  },
+  "reproduce_from_scratch": {
+   "label": "ARTIFACT_VERIFIED",
+   "result": "all PASS, both negative controls fail as required, model hashes identical",
+   "file": "RESULTS/reproduce_from_scratch.txt"
+  }
+ },
+ "synthetic_model_sha256": {
+  "synth-f32-s1.gguf": "54de976108c35564530add6cd295a4129b4f6edc8a38dacd333e7f752031be63",
+  "synth-f32-s2.gguf": "699b5057081d3bc6885c76c6e25817155aa723df8cad36ea81a9b19108e93213",
+  "synth-f32-s3.gguf": "2e70bf85791efdebdcb670b43a70881900420deccc86a5581999c0c9819170cf",
+  "synth-q4km-s1.gguf": "49e72c7497c71994ac5ddaae705f00c215acc072b49e914eaa79380b4cda5f2d",
+  "synth-q4km-s2.gguf": "039a2690a76385798453b246163ee4d12507c59cde80de89df2c56f6aaa5f71b",
+  "synth-q4km-s3.gguf": "9116401ebae1279c1bb031eda78293e2dfcf396a11a7313ab816134bb021edf9"
+ },
+ "file_sha256": {
+  "TESTS/test_emu_vs_oracle.py": "e58ffa6073ed48aa9e8359871308576666242c73ec5b66ea632d5364b26083e7",
+  "TESTS/test_gles_exact_lib.py": "ea9773f5bdb47e7decc533e8c05217606fcb57a1232113904b637a39cff06674",
+  "TESTS/test_gles_fa_vs_oracle.py": "3554f464b7286b6ea0083e09ae22b53502d9efbd065ada38913809f5c34cc96c",
+  "TESTS/test_gles_layer_vs_oracle.py": "e7368ed645aa0fd552a07ef5104ec2dca6e3aa69e5fa94fbff854bbe03b996e6",
+  "TESTS/test_gles_matvec_vs_oracle.py": "86bb4d28745afd419618c290c87ac1bc77ca047af14bffc08418e55fe719ffe2",
+  "emu/ggml_emu.py": "8b54bb0bd2d25e61ed4f4338e573bb48c818a42b8ffff994dc28a90ab7fb5839",
+  "emu/glibc_expf.py": "4550e4b996f61af9b3b4c2b059d6acfcee6570b51a1dd61be059c5b37fc1562a",
+  "experiments/sensitivity.py": "87aa4572b8028781ee230a14a392c1cfc8b3e29cfca74cfa21adaf39c34aa082",
+  "experiments/summarize_sensitivity.py": "fb9df999a27c3f99258d8d0a1e0386ad28fb5bd1b80de513e0de69b3336c6845",
+  "reproduce.sh": "1148addcb8404eb40493e2227b4f475d0e1b15dd37bd0ddf4417bd0d750e6256",
+  "shaders/ggml_eltwise.comp": "e8118e7177b5d28de3ce37f5cc07eafabd43444219f2ae57675e074c5fc33967",
+  "shaders/ggml_exact_lib.glsl": "9062b05abf291cf8d59587ad82b48ea5c030ffa7dfbb8040704c651ad4baa568",
+  "shaders/ggml_fa_f16.comp": "2fbea34f626d2343661f8915007e00e8a11eed9f93745d406df23055d4960831",
+  "shaders/ggml_matvec_qk.comp": "7814232fb0de733cd53ec28c5e3429dabdf6ebb224c75a9aea1c1828a0c77595",
+  "shaders/ggml_q8k_quantize.comp": "4aef4cd7facf7acd075b6613df44f6bd6a5188e1eb61ddfb541fb9d444fea856",
+  "shaders/ggml_rms_norm_mul.comp": "692803735adb9c7ca03bd5c86a8a4862599e73dfc1d4ad23e15cf856bfcac31f",
+  "shaders/ggml_rope_neox.comp": "adcf794642658cb55cdad538fe655a2c8686cce865df0934b5f8f1eb11b03f14",
+  "shaders/unit_exact_lib.comp": "2372d52087b957497230a64ee3e3f13a4732b9351c0130ea36014c0994331db7",
+  "tools/compile_check.sh": "5aa2b3a45f6a18402b732d2000c27f6d47549095502546a834cc356bc9aa935e",
+  "tools/dump_layer0.cpp": "d9770d524f1da92f3325fa438ea28de4744b220c61cb0b6422752972a460dcb9",
+  "tools/gles_run.c": "12c21509f7c43dba074378926b3459f81346103690b150a133efa19df65e1cd4",
+  "tools/gles_run_guarded.sh": "bfb031ad90722ec869c3be5653ee392c39531b6c1bcf01e06d99a0f78a6fa68f",
+  "tools/make_synth_qwen3.py": "33b68f0ab5bf3448c3e1971527d32d14ba68ca88d6037e079bc06a09e72c1c09"
+ },
+ "blockers": [
+  {
+   "id": "provenance",
+   "label": "UNKNOWN",
+   "what": "which CPU oracle GPU-016/021 compared against (PS4 CPU llama.cpp? IdeaPad AVX2/FMA build? FA on/off? Python?)",
+   "unblock": "HANDOFF-CODEX.md Job 3"
+  },
+  {
+   "id": "runner_source",
+   "label": "UNKNOWN",
+   "what": "the 021 runner's shader sources are not in the cloud; no diff possible",
+   "unblock": "HANDOFF-CODEX.md Job 3"
+  },
+  {
+   "id": "real_weights",
+   "label": "UNKNOWN",
+   "what": "not run with the real Qwen3-0.6B-Q4_K_M (sha b0638f08...)",
+   "unblock": "HANDOFF-CODEX.md Job 2"
+  },
+  {
+   "id": "radeonsi_ieee",
+   "label": "UNKNOWN",
+   "what": "denormal handling and contraction under `precise` on Liverpool",
+   "unblock": "GPU-022 steps A-B (owner approval required)"
+  },
+  {
+   "id": "codex_quota",
+   "label": "USER_REPORTED",
+   "what": "Codex usage exhausted 2026-10-23; offline jobs go to agy or opencode"
+  }
+ ],
+ "residual_risks": [
+  "expf ~4e-7 per call vs glibc (glibc misrounds)",
+  "RMSNorm double-float ~48 bits vs ggml's 53-bit double",
+  "q8k quantize uses 256-invocation workgroups (GLES minimum is 128)"
+ ],
+ "next_actions": [
+  {
+   "who": "owner launches agy/opencode on the IdeaPad",
+   "what": "HANDOFF-CODEX.md Jobs 1-4 (offline, no PS4)"
+  },
+  {
+   "who": "agy",
+   "what": "HANDOFF-AGY.md adversarial review"
+  },
+  {
+   "who": "next Claude lead",
+   "what": "verify offline results, then ask the owner for GPU-022 approval (HANDOFF-CLAUDE.md section 3)"
+  }
+ ],
+ "hard_limits": "no PS4 boot/reboot/payload/storage write/kernel or firmware change/GPU dispatch without fresh operation-specific owner approval; owner runs payload sends and boot-ID re-pins; never touch GoldenPi, PS4 #3 or the stream PC"
+}
