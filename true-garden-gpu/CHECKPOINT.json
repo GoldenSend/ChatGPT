@@ -1,6 +1,6 @@
 {
  "schema": "true-garden-gpu-checkpoint/1",
- "updated_utc": "2026-10-23T21:55:00Z",
+ "updated_utc": "2026-10-23T22:05:00Z",
  "repo": "GoldenSend/ChatGPT",
  "branch": "claude/project-thread-uovzkj",
  "pull_request": "https://github.com/GoldenSend/ChatGPT/pull/2 (draft)",
@@ -74,6 +74,19 @@
    "boot_id": "092d4a88-7f6f-4c4e-a1e3-238d727d6048",
    "result": "step A PASS on Liverpool (7/7 shaders compile+link; radeonsi liverpool, LLVM 19.1.7, ES 3.2, Mesa 24.0.9 via run-with-mesa24.sh, GBM renderD128); HOLD at the health check after A: flush-8:0 kworker in D in 5/5 samples; B and C not run; no kernel messages during the run",
    "follow_up": "read-only check 21:48Z clean (no D, Dirty 136 kB, Writeback 0); no hung-task detector in this kernel; gate v3 (RAM run dir, I/O-progress stall rule); owner approved one rerun 21:45Z into ~/ps4-llm-test/gpu-022b"
+  },
+  "gpu022_run2_hardware": {
+   "label": "LIVE_OBS (owner's paste)",
+   "at": "2026-10-23T21:54Z",
+   "boot_id": "092d4a88-7f6f-4c4e-a1e3-238d727d6048",
+   "result": "A PASS; B 6/7 bit-exact on Liverpool (f16r, glibc expf port, rcp_cr, sqrt_cr, SiLU, RMSNorm); B4 ggml_v_expf 4775/73728 differ, first index 35; C not run (B failure skips C); no HOLD",
+   "explanation": "fp32 denormal flush (FTZ): experiments/ftz/ftz_model.py predicts exactly 4775 diffs from index 35, x <= -81.1; predicted output sha256 131031f6553c5faf684d5f27cba43d68e46b5d50f411b700c0a82bfc28334400 (hardware hash not yet checked); layer 0 with FTZ in exp functions 3780/3780 identical offline",
+   "file": "RESULTS/ftz_model.txt"
+  },
+  "gpu021_attention_offline": {
+   "label": "ARTIFACT_VERIFIED (LLVMPipe; shader transcribed from the owner's paste, not hash-verified)",
+   "result": "021 attn_two_token_gqa.comp vs llama.cpp FA at token 1: 120/120 cases differ (251-1466 of 2048 values); token 0 exact; the numpy model with only the sequential KQ dot reproduces every count; exp and scale choices change nothing (1 case for exp); l_out changed in 111/120, all 1024 values in 9",
+   "file": "RESULTS/gpu021_attention.json"
   }
  },
  "synthetic_model_sha256": {
@@ -85,7 +98,7 @@
   "synth-q4km-s3.gguf": "9116401ebae1279c1bb031eda78293e2dfcf396a11a7313ab816134bb021edf9"
  },
  "file_sha256": {
-  "GATE-GPU-022.md": "a7e2a2d78b6b4435cd1767ed9a11ac8a3a27a8c4203b4d6f74870747e045a415",
+  "GATE-GPU-022.md": "c9978a9f29030f95c0fc3b73e77f7e2054377f818b0a5876edbe07b7cb5b699f",
   "TESTS/test_emu_vs_oracle.py": "e58ffa6073ed48aa9e8359871308576666242c73ec5b66ea632d5364b26083e7",
   "TESTS/test_gate_stops.sh": "e5421ac5c0e05691365f0f4c4adf57d570687a9c74df1305b9adf75500844296",
   "TESTS/test_gles_exact_lib.py": "ea9773f5bdb47e7decc533e8c05217606fcb57a1232113904b637a39cff06674",
@@ -94,6 +107,9 @@
   "TESTS/test_gles_matvec_vs_oracle.py": "86bb4d28745afd419618c290c87ac1bc77ca047af14bffc08418e55fe719ffe2",
   "emu/ggml_emu.py": "be87ffffe1df236bc79564a4f66b427b57faf016fb8ec08b2f4f3a6d40d8d559",
   "emu/glibc_expf.py": "4550e4b996f61af9b3b4c2b059d6acfcee6570b51a1dd61be059c5b37fc1562a",
+  "experiments/ftz/ftz_model.py": "a17711601ac07974448612ff4695e82cb130a9d8f19cd88f24c37cebd37ef026",
+  "experiments/gpu021/attn_two_token_gqa.comp": "c3d7ca782538deeeef005e1373954426ea8882c4a5712e4364d34893a7430814",
+  "experiments/gpu021/run_attention.py": "ec619206bac793c4c73cb6a2f1a4ebd7799ca3b135467586b9d3f35d489846e4",
   "experiments/sensitivity.py": "87aa4572b8028781ee230a14a392c1cfc8b3e29cfca74cfa21adaf39c34aa082",
   "experiments/summarize_sensitivity.py": "fb9df999a27c3f99258d8d0a1e0386ad28fb5bd1b80de513e0de69b3336c6845",
   "reproduce.sh": "8974c7903952a15a3c335c3cb2143b0f481dac260be04da595edd30eef383c08",
@@ -162,8 +178,8 @@
  ],
  "next_actions": [
   {
-   "who": "owner on the IdeaPad",
-   "what": "rerun: git pull, sha check, staging into ~/ps4-llm-test/gpu-022b, sync, one gate run on boot 092d4a88"
+   "who": "owner",
+   "what": "decide on GPU-022 part C (decision card); the command checks the B4 hash against the FTZ prediction before running C"
   },
   {
    "who": "lead",

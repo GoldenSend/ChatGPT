@@ -1,0 +1,2 @@
+B4 under FTZ: 4775 of 73728 values differ from expected, first at index 35, x in [-99.9977, -81.0965]; sha256 of predicted output 131031f6553c5faf684d5f27cba43d68e46b5d50f411b700c0a82bfc28334400
+layer 0 with FTZ in ggml_v_expf and expf: 3780 of 3780 stage outputs bit-identical (3 models x 10 sequences x 7 steps)

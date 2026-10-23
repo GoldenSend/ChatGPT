@@ -55,6 +55,15 @@ cd $M/repo && git pull -q && bash true-garden-gpu/tools/gpu022_preflight.sh 2>&1
 - Fix (gate v3): the run writes only to `/dev/shm` until aftercare; a stuck non-GPU process stops the gate only if no block I/O completed during the 4 s; GPU-related threads and a still-alive runner stop it at once; every failing condition is listed. `TESTS/test_gate_stops.sh`: 22 of 22.
 - The owner approved one rerun at 21:45Z ("Approve one rerun"): same scope, new folder `~/ps4-llm-test/gpu-022b/`, no further retry.
 
+## Run 2 (2026-10-23 21:54Z, approved rerun, folder gpu-022b): A PASS, B 6 of 7 bit-exact, C not run
+
+- No HOLD: the health checks passed at every point, with the run directory in `/dev/shm` (LIVE_OBS via the owner's paste).
+- Step A as in run 1. Part B on Liverpool: `B1_f16r`, `B2_glibc_expf`, `B3_rcp_cr`, `B5_sqrt_cr`, `B6_silu` and `B7_rms_norm` are bit-exact. `B4_ggml_v_expf`: 4775 of 73728 values differ, the first at index 35. The gate then stopped by design (a B failure skips C).
+- Explanation (INFERENCE, exact count match): radeonsi flushes fp32 denormals to zero (FTZ), as GCN compute shaders do by default; LLVMPipe and the CPU keep them. `experiments/ftz/ftz_model.py` replays the shader's operation sequence with every fp32 result flushed and predicts exactly 4775 differing values, the first at index 35, all for inputs at or below -81.1 (results below ~1e-35). Its predicted output hashes to `131031f6...`; the part C command checks the hardware output against that hash, bit for bit, before C runs.
+- Effect on layer 0: none expected. `ggml_v_expf` feeds only SiLU, where `1 + v` with `v < 1e-35` rounds to 1 either way; flash attention's `expf` underflow is absorbed the same way (`S >= 1`, FP16 accumulator). With FTZ in both functions, 3780 of 3780 layer-0 stage outputs stay bit-identical (3 synthetic models x 10 random 7-token sequences). The model covers only the two exp functions; other ops produce no denormals on these inputs (INFERENCE).
+- `B2_glibc_expf` only tested inputs down to -87.3 (no denormal results), so it could not see FTZ.
+- Part C (182 dispatches) needs a new owner approval; asked 2026-10-23 ~22:00Z.
+
 ## Phase 2: what the approval covers
 
 The bundle is `gate/gpu022-bundle.tar.gz` in this folder (sha256 in `CHECKPOINT.json`):
