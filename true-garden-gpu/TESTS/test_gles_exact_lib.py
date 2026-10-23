@@ -12,6 +12,7 @@ import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "emu"))
+import ggml_emu as E  # noqa: E402
 import glibc_expf as G  # noqa: E402
 
 LIB = os.path.join(HERE, "..", "shaders", "ggml_exact_lib.glsl")
@@ -73,6 +74,35 @@ def main():
     # correctly rounded reciprocal on the range S can take (1 <= S <= n_kv)
     x = np.concatenate([1 + rng.random(n) * 4095, rng.random(n // 8) * 4 + 1]).astype(np.float32)
     total += report("rcp_cr on [1, 4096]", x, run(gles, work, 2, x), (np.float32(1) / x).astype(np.float32))
+
+    # ggml_v_expf (SSE2, no FMA) over its whole useful range, including the |n| > 126 branches
+    x = np.concatenate([(rng.random(n) - 0.5) * 200, (rng.random(n // 8) - 0.5) * 20]).astype(np.float32)
+    total += report("ggml_v_expf on [-100, 100]", x, run(gles, work, 3, x), E.v_expf(x))
+
+    # correctly rounded sqrt over mean-square values RMSNorm can see
+    x = np.exp(rng.uniform(np.log(1e-12), np.log(1e8), n)).astype(np.float32)
+    total += report("sqrt_cr on [1e-12, 1e8]", x, run(gles, work, 4, x), np.sqrt(x).astype(np.float32))
+
+    # ggml silu (swiglu with up = 1) on gate values
+    x = np.concatenate([(rng.random(n) - 0.5) * 40, rng.standard_normal(n // 4) * 2]).astype(np.float32)
+    total += report("ggml silu on [-20, 20]", x, run(gles, work, 5, x), E.swiglu(x, np.ones_like(x)))
+
+    # RMSNorm kernel: double-float sequential sum vs ggml's double sum, including
+    # Qwen-style massive activations (a few channels in the thousands)
+    rows = 4096
+    X = (rng.standard_normal((rows, 1024)) * np.exp(rng.uniform(-6, 3, (rows, 1)))).astype(np.float32)
+    X[::7, rng.integers(0, 1024, rows // 7 + 1)[: len(X[::7])]] *= 3000
+    Wn = (1 + rng.standard_normal(1024) * 0.3).astype(np.float32)
+    prm, xi, wi, yo = (os.path.join(work, f"rn_{k}.bin") for k in "pxwy")
+    np.array([1024, rows, np.float32(1e-6).view(np.int32), 1], np.int32).tofile(prm)
+    X.tofile(xi)
+    Wn.tofile(wi)
+    subprocess.run([gles, "--src", LIB, "--src", os.path.join(HERE, "..", "shaders", "ggml_rms_norm_mul.comp"),
+                    "--groups", str(rows), "--in", f"0:{prm}", "--in", f"1:{xi}", "--in", f"2:{wi}",
+                    "--out", f"3:{yo}:{rows * 1024 * 4}"], check=True, stderr=subprocess.DEVNULL)
+    got = np.fromfile(yo, np.float32)
+    ref = (E.rms_norm(X, 1e-6) * Wn).astype(np.float32).reshape(-1)
+    total += report(f"rms_norm*w ({rows} rows x 1024)", got, got, ref)
 
     print("RESULT:", "PASS" if total == 0 else f"FAIL ({total} unexplained mismatches)",
           "(expf known-class mismatches are listed above and are not counted)")

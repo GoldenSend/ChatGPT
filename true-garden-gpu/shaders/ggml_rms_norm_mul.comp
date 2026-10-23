@@ -1,0 +1,39 @@
+// ggml-exact rms_norm (+ optional weight multiply) over rows of length n (n a
+// power of two: 1024 for the residual, 128 for Qwen3's per-head q/k norms).
+// ggml (ops.cpp) accumulates the squares sequentially in double; here the
+// sequential sum is carried as a double-float (~48 bits), which gives the
+// same float mean unless the exact sum sits within ~2^-47 of a float midpoint.
+// mean = (float)(sum/n); scale = 1.0f/sqrtf(mean+eps); y = (x*scale)*w
+// requires ggml_exact_lib.glsl
+layout(local_size_x = 128) in;
+layout(std430, binding = 0) readonly buffer Params { int n; int rows; uint eps_bits; int has_w; } P;
+layout(std430, binding = 1) readonly buffer Xb { float x[]; };
+layout(std430, binding = 2) readonly buffer Wb { float wt[]; };
+layout(std430, binding = 3) writeonly buffer Yb { float y[]; };
+
+shared float s_scale;
+
+void main() {
+    uint row = gl_WorkGroupID.x;
+    uint t = gl_LocalInvocationID.x;
+    uint n = uint(P.n);
+    uint base = row * n;
+    if (t == 0u) {
+        vec2 acc = vec2(0.0);
+        for (uint i = 0u; i < n; i++) {
+            precise float sq = x[base + i] * x[base + i];
+            vec2 s = two_sum(acc.x, sq);
+            precise float lo = s.y + acc.y;
+            acc = fast_two_sum(s.x, lo);
+        }
+        precise float mean = ldexp(acc.x, -findMSB(n));       // exact: n is a power of two
+        precise float me = mean + uintBitsToFloat(P.eps_bits);
+        s_scale = rcp_cr(sqrt_cr(me));
+    }
+    barrier();
+    for (uint i = t; i < n; i += gl_WorkGroupSize.x) {
+        precise float v = x[base + i] * s_scale;
+        if (P.has_w != 0) v = v * wt[i];
+        y[base + i] = v;
+    }
+}

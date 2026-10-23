@@ -1,0 +1,126 @@
+// ggml-exact mat-vec y = W x for Q4_K / Q6_K weights against a Q8_K-quantized
+// activation (from ggml_q8k_quantize.comp). Reproduces ggml_vec_dot_q4_K_q8_K
+// and ggml_vec_dot_q6_K_q8_K of llama.cpp 23b0202a on the __AVX__ (no AVX2)
+// path: exact integer partial sums per SIMD lane, then per-lane float
+// accumulation d*sumi + acc across blocks (no FMA) and hsum_float_8.
+// One invocation per output row (correctness first; not tuned).
+// requires ggml_exact_lib.glsl
+layout(local_size_x = 64) in;
+layout(std430, binding = 0) readonly buffer Params { int rows; int nb; int qtype; } P;  // qtype 4 or 6
+layout(std430, binding = 1) readonly buffer Wb { uint w[]; };   // raw GGUF blocks, row-major
+layout(std430, binding = 2) readonly buffer Q8b { uint q8[]; }; // 273 words per block
+layout(std430, binding = 3) writeonly buffer Yb { float yout[]; };
+
+uint rd8(uint off) { return (w[off >> 2] >> ((off & 3u) * 8u)) & 0xffu; }
+float rdf16(uint off) { return f16_to_f32(rd8(off) | (rd8(off + 1u) << 8)); }
+int q8qs(uint blk, uint i) { return int(q8[blk * 273u + 1u + i]); }
+int q8bs(uint blk, uint i) { return int(q8[blk * 273u + 257u + i]); }
+float q8d(uint blk) { return uintBitsToFloat(q8[blk * 273u]); }
+
+float hsum8(float a[8]) {
+    precise float r0 = a[4] + a[0];
+    precise float r1 = a[5] + a[1];
+    precise float r2 = a[6] + a[2];
+    precise float r3 = a[7] + a[3];
+    precise float u0 = r0 + r2;
+    precise float u1 = r1 + r3;
+    precise float s = u0 + u1;
+    return s;
+}
+
+float row_q4k(uint row) {
+    precise float acc[8] = float[8](0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+    precise float accm[4] = float[4](0.0, 0.0, 0.0, 0.0);
+    for (uint i = 0u; i < uint(P.nb); i++) {
+        uint o = (row * uint(P.nb) + i) * 144u;
+        int sc[8];
+        int mn[8];
+        for (uint j = 0u; j < 8u; j++) {  // get_scale_min_k4
+            if (j < 4u) {
+                sc[j] = int(rd8(o + 4u + j) & 63u);
+                mn[j] = int(rd8(o + 4u + j + 4u) & 63u);
+            } else {
+                sc[j] = int((rd8(o + 4u + j + 4u) & 0xFu) | ((rd8(o + 4u + j - 4u) >> 6) << 4));
+                mn[j] = int((rd8(o + 4u + j + 4u) >> 4) | ((rd8(o + 4u + j) >> 6) << 4));
+            }
+        }
+        int sumi[8] = int[8](0, 0, 0, 0, 0, 0, 0, 0);
+        for (uint j = 0u; j < 4u; j++)
+        for (uint lh = 0u; lh < 2u; lh++)
+        for (uint h = 0u; h < 2u; h++)
+        for (uint k = 0u; k < 4u; k++) {
+            int s = 0;
+            for (uint e = 0u; e < 4u; e++) {
+                uint byte_ = rd8(o + 16u + 32u * j + 16u * h + 4u * k + e);
+                int q4 = int(lh == 0u ? (byte_ & 0xFu) : (byte_ >> 4));
+                s += q4 * q8qs(i, 64u * j + 32u * lh + 16u * h + 4u * k + e);
+            }
+            sumi[h * 4u + k] += sc[2u * j + lh] * s;
+        }
+        int pm[4];
+        for (uint l = 0u; l < 4u; l++) {
+            int q8s0 = q8bs(i, 4u * l) + q8bs(i, 4u * l + 1u);
+            int q8s1 = q8bs(i, 4u * l + 2u) + q8bs(i, 4u * l + 3u);
+            pm[l] = mn[2u * l] * q8s0 + mn[2u * l + 1u] * q8s1;
+        }
+        float yd = q8d(i);
+        precise float d = yd * rdf16(o);
+        precise float dmin = -yd * rdf16(o + 2u);
+        for (uint l = 0u; l < 4u; l++) {
+            precise float t = dmin * i2f_rne(pm[l]);
+            accm[l] = t + accm[l];
+        }
+        for (uint l = 0u; l < 8u; l++) {
+            precise float t = d * i2f_rne(sumi[l]);
+            acc[l] = t + acc[l];
+        }
+    }
+    precise float m0 = accm[0] + accm[2];
+    precise float m1 = accm[1] + accm[3];
+    precise float msum = m0 + m1;
+    precise float total = hsum8(acc) + msum;
+    return total;
+}
+
+float row_q6k(uint row) {
+    precise float acc[8] = float[8](0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+    for (uint i = 0u; i < uint(P.nb); i++) {
+        uint o = (row * uint(P.nb) + i) * 210u;
+        int sumi[8] = int[8](0, 0, 0, 0, 0, 0, 0, 0);
+        for (uint j = 0u; j < 2u; j++)
+        for (uint c = 0u; c < 8u; c++)
+        for (uint k = 0u; k < 4u; k++) {
+            int s = 0;
+            for (uint e = 0u; e < 4u; e++) {
+                uint l = 16u * (c & 1u) + 4u * k + e;   // 0..31 within the 32-wide ql/qh run
+                uint quarter = c >> 1;                   // 0..3 -> +0, +32, +64, +96
+                uint qlb = rd8(o + 64u * j + l + (quarter & 1u) * 32u);
+                uint qhb = rd8(o + 128u + 32u * j + l);
+                uint lo = (quarter < 2u) ? (qlb & 0xFu) : (qlb >> 4);
+                uint hi = (qhb >> (2u * quarter)) & 3u;
+                int q6 = int(lo | (hi << 4));
+                s += q6 * q8qs(i, 128u * j + 16u * c + 4u * k + e);
+            }
+            int scv = int(int(rd8(o + 192u + 8u * j + c)) << 24) >> 24;  // int8
+            sumi[(c & 1u) * 4u + k] += scv * s;
+        }
+        for (uint half_ = 0u; half_ < 2u; half_++)
+        for (uint m = 0u; m < 4u; m++) {
+            int s0 = int(int(rd8(o + 192u + 8u * half_ + 2u * m)) << 24) >> 24;
+            int s1 = int(int(rd8(o + 192u + 8u * half_ + 2u * m + 1u)) << 24) >> 24;
+            sumi[half_ * 4u + m] -= 32 * (q8bs(i, 8u * half_ + 2u * m) * s0 + q8bs(i, 8u * half_ + 2u * m + 1u) * s1);
+        }
+        precise float d = q8d(i) * rdf16(o + 208u);
+        for (uint l = 0u; l < 8u; l++) {
+            precise float t = d * i2f_rne(sumi[l]);
+            acc[l] = t + acc[l];
+        }
+    }
+    return hsum8(acc);
+}
+
+void main() {
+    uint row = gl_GlobalInvocationID.x;
+    if (row >= uint(P.rows)) return;
+    yout[row] = P.qtype == 4 ? row_q4k(row) : row_q6k(row);
+}

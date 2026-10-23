@@ -230,7 +230,11 @@ def rope_neox(x, pos, n_dims=128, freq_base=1e6, cache=None):
 
 def v_expf(x):
     """ggml_v_expf, SSE2 variant without FMA (MADD128 = mul then add)."""
-    x = np.asarray(x, F32)
+    with np.errstate(over="ignore", invalid="ignore"):
+        return _v_expf(np.asarray(x, F32))
+
+
+def _v_expf(x):
     r = F32(12582912.0)
     z = ((x * F32(float.fromhex('0x1.715476p+0'))).astype(F32) + r).astype(F32)
     n = (z - r).astype(F32)

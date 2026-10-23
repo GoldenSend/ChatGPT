@@ -134,3 +134,81 @@ float rcp_cr(float b) {
     return best;
 }
 
+
+// ---------------------------------------------------------------- correctly rounded a/b and helpers
+
+float rcp_cr_signed(float b) {
+    float r = rcp_cr(abs(b));
+    return b < 0.0 ? -r : r;
+}
+
+// IEEE round-to-nearest-even a/b for normal, finite operands whose quotient is normal.
+float div_cr(float a, float b) {
+    precise float q0 = a / b;
+    if (a == 0.0) return q0;
+    float best = q0;
+    float best_res = 1e30;
+    for (int dlt = -3; dlt <= 3; dlt++) {
+        float qc = uintBitsToFloat(uint(int(floatBitsToUint(q0)) + dlt));
+        vec2 pe = two_prod(b, qc);
+        precise float res = abs((a - pe.x) - pe.y);
+        if (res < best_res) { best_res = res; best = qc; }
+    }
+    return best;
+}
+
+// int -> float with round-to-nearest-even for any 32-bit int (GLSL leaves
+// the rounding of out-of-range conversions unspecified).
+float i2f_rne(int v) {
+    uint a = uint(v < 0 ? -v : v);
+    if (a < 0x1000000u) return v < 0 ? -float(a) : float(a);
+    int sh = findMSB(a) - 23;
+    uint q = a >> uint(sh);
+    uint rem = a & ((1u << uint(sh)) - 1u);
+    uint half_ = 1u << uint(sh - 1);
+    if (rem > half_ || (rem == half_ && (q & 1u) == 1u)) q += 1u;
+    float f = ldexp(float(q), sh);
+    return v < 0 ? -f : f;
+}
+
+// correctly rounded sqrt for positive normal a
+float sqrt_cr(float a) {
+    precise float s0 = sqrt(a);
+    float best = s0;
+    float best_res = 1e30;
+    for (int dlt = -2; dlt <= 2; dlt++) {
+        float r = uintBitsToFloat(uint(int(floatBitsToUint(s0)) + dlt));
+        vec2 pe = two_prod(r, r);
+        precise float res = abs((a - pe.x) - pe.y);
+        if (res < best_res) { best_res = res; best = r; }
+    }
+    return best;
+}
+
+// ggml_v_expf, SSE2 build without FMA (MADD128 = mul then add), per lane.
+float ggml_v_expf(float x) {
+    const float r = 12582912.0;  // 0x1.8p23
+    precise float z = x * uintBitsToFloat(0x3fb8aa3bu) + r;      // 0x1.715476p+0
+    precise float n = z - r;
+    precise float b = (x - n * uintBitsToFloat(0x3f317200u)) - n * uintBitsToFloat(0x35bfbe8eu);  // 0x1.62e4p-1, 0x1.7f7d1cp-20
+    uint e = floatBitsToUint(z) << 23;
+    float k = uintBitsToFloat(e + floatBitsToUint(1.0));
+    bool c = abs(n) > 126.0;
+    precise float u = b * b;
+    precise float j = ((uintBitsToFloat(0x3c072010u) * b + uintBitsToFloat(0x3d2b9f17u)) * u
+                       + (uintBitsToFloat(0x3e2aaf33u) * b + uintBitsToFloat(0x3efffedbu))) * u
+                      + uintBitsToFloat(0x3f7ffff6u) * b;   // 0x1.0e4020p-7, 0x1.573e2ep-5, 0x1.555e66p-3, 0x1.fffdb6p-2, 0x1.ffffecp-1
+    if (!c) {
+        precise float res = j * k + k;
+        return res;
+    }
+    uint g = (n <= 0.0) ? 0x82000000u : 0u;
+    float s1 = uintBitsToFloat(g + 0x7f000000u);
+    float s2 = uintBitsToFloat(e - g);
+    if (abs(n) > 192.0) {
+        precise float res = s1 * s1;
+        return res;
+    }
+    precise float res = (s2 * j + s2) * s1;
+    return res;
+}

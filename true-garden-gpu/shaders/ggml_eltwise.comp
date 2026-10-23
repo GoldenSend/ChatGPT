@@ -1,0 +1,36 @@
+// Element-wise ops, ggml-exact. MODE 0: y = a + b (ggml_add), 1: y = silu(a) * b
+// (ggml_vec_swiglu_f32, SSE2 ggml_v_silu path), 2: pack a to FP16 bits (two
+// per uint, round-to-nearest-even) for the K/V cache.
+// requires ggml_exact_lib.glsl
+layout(local_size_x = 64) in;
+layout(std430, binding = 0) readonly buffer Ab { float a[]; };
+layout(std430, binding = 1) readonly buffer Bb { float b[]; };
+layout(std430, binding = 2) writeonly buffer Yb { uint y[]; };
+uniform int mode;
+uniform int n;
+
+void main() {
+    int i = int(gl_GlobalInvocationID.x);
+    if (mode == 2) {
+        if (2 * i >= n) return;
+        uint lo = f32_to_f16_rne(a[2 * i]);
+        uint hi = f32_to_f16_rne(a[2 * i + 1]);
+        y[i] = lo | (hi << 16);
+        return;
+    }
+    if (i >= n) return;
+    float r;
+    if (mode == 0) {
+        precise float s = a[i] + b[i];
+        r = s;
+    } else {
+        float g = a[i];
+        precise float neg = 0.0 - g;
+        float ex = ggml_v_expf(neg);
+        precise float den = 1.0 + ex;
+        float silu = div_cr(g, den);
+        precise float out_ = silu * b[i];
+        r = out_;
+    }
+    y[i] = floatBitsToUint(r);
+}

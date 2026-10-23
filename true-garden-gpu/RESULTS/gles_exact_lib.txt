@@ -1,5 +1,10 @@
-# GLSL helpers vs CPU reference on 2026-10-23T20:12:14Z
+# GLSL helpers vs CPU reference, 2026-10-23T20:21:19Z
+GL_RENDERER: llvmpipe (LLVM 20.1.2, 256 bits) | GL_VERSION: OpenGL ES 3.2 Mesa 25.2.8-0ubuntu0.24.04.4
 f16r (f32->f16 RNE->f32)           n=  4404114 mismatches=0
 glibc_expf on [-87.3, 4]           n=  4718594 mismatches=2 (known class: glibc not correctly rounded, port is: 2)
 rcp_cr on [1, 4096]                n=  4718592 mismatches=0
+ggml_v_expf on [-100, 100]         n=  4718592 mismatches=0
+sqrt_cr on [1e-12, 1e8]            n=  4194304 mismatches=0
+ggml silu on [-20, 20]             n=  5242880 mismatches=0
+rms_norm*w (4096 rows x 1024)      n=  4194304 mismatches=0
 RESULT: PASS (expf known-class mismatches are listed above and are not counted)

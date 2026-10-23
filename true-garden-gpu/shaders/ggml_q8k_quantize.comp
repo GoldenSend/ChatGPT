@@ -1,0 +1,60 @@
+// ggml-exact quantize_row_q8_K_ref (llama.cpp 23b0202a): one workgroup per
+// 256-element block. Output per block, as 273 uint words:
+//   [0] d (float bits) | [1..256] qs (int bits) | [257..272] bsums (int bits)
+// requires ggml_exact_lib.glsl
+layout(local_size_x = 256) in;
+layout(std430, binding = 0) readonly buffer Xb { float x[]; };
+layout(std430, binding = 1) writeonly buffer Yb { uint y[]; };
+
+shared float s_abs[256];
+shared int s_idx[256];
+shared int s_q[256];
+shared float s_iscale;
+shared bool s_zero;
+
+void main() {
+    uint b = gl_WorkGroupID.x;
+    uint t = gl_LocalInvocationID.x;
+    float xv = x[b * 256u + t];
+    s_abs[t] = abs(xv);
+    s_idx[t] = int(t);
+    barrier();
+    // first index of the largest |x| (ggml scans with a strict '>')
+    for (uint st = 128u; st > 0u; st >>= 1) {
+        if (t < st) {
+            float a = s_abs[t];
+            float c = s_abs[t + st];
+            if (c > a || (c == a && s_idx[t + st] < s_idx[t])) {
+                s_abs[t] = c;
+                s_idx[t] = s_idx[t + st];
+            }
+        }
+        barrier();
+    }
+    uint base = b * 273u;
+    if (t == 0u) {
+        s_zero = s_abs[0] == 0.0;
+        if (!s_zero) {
+            float mx = x[b * 256u + uint(s_idx[0])];
+            float iscale = div_cr(-127.0, mx);
+            s_iscale = iscale;
+            y[base] = floatBitsToUint(rcp_cr_signed(iscale));
+        } else {
+            y[base] = 0u;
+        }
+    }
+    barrier();
+    int qv = 0;
+    if (!s_zero) {
+        precise float v = s_iscale * xv;
+        qv = min(127, int(roundEven(v)));
+    }
+    s_q[t] = qv;
+    y[base + 1u + t] = uint(qv);
+    barrier();
+    if (t < 16u) {
+        int s = 0;
+        for (uint i = 0u; i < 16u; i++) s += s_q[16u * t + i];
+        y[base + 257u + t] = uint(s);
+    }
+}

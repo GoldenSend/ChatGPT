@@ -1,0 +1,29 @@
+// ggml NEOX rope for one position: dst[i] = x0*cos - x1*sin, dst[i+n/2] = x0*sin + x1*cos.
+// cos/sin come from a host-built table (ggml_rope_cache_init: float theta chain
+// theta *= theta_scale, glibc cosf/sinf), so the GPU never evaluates trig.
+// requires ggml_exact_lib.glsl
+layout(local_size_x = 64) in;
+layout(std430, binding = 0) readonly buffer Params { int n_heads; int n_dims; } P;
+layout(std430, binding = 1) readonly buffer Xb { float x[]; };
+layout(std430, binding = 2) readonly buffer Tb { float tab[]; };   // [n_dims/2 cos][n_dims/2 sin]
+layout(std430, binding = 3) writeonly buffer Yb { float y[]; };
+
+void main() {
+    uint h = gl_WorkGroupID.x;
+    uint i = gl_LocalInvocationID.x;
+    uint hd = uint(P.n_dims) / 2u;
+    if (i >= hd) return;
+    uint b = h * uint(P.n_dims);
+    float c = tab[i];
+    float s = tab[hd + i];
+    float x0 = x[b + i];
+    float x1 = x[b + hd + i];
+    precise float a0 = x0 * c;
+    precise float a1 = x1 * s;
+    precise float r0 = a0 - a1;
+    precise float b0 = x0 * s;
+    precise float b1 = x1 * c;
+    precise float r1 = b0 + b1;
+    y[b + i] = r0;
+    y[b + hd + i] = r1;
+}
