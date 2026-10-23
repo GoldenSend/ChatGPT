@@ -1,0 +1,138 @@
+#version 310 es
+#extension GL_EXT_gpu_shader5 : require
+precision highp float;
+precision highp int;
+// One token query 16 heads / 8 key-value heads, head dim128.
+// GPU-resident cache holds FP16-rounded K,V from at most 2 positions.
+uint half_bits_common(uint bits, bool rne) {
+ uint sign=(bits >> 16u) & 0x8000u;
+ uint exp32=(bits >> 23u) & 0xffu;
+ uint fraction=bits & 0x7fffffu;
+ if (exp32==255u) return sign | (fraction==0u ? 0x7c00u : (0x7e00u | (fraction >> 13u)));
+ if (exp32>=143u) return sign | (rne ? 0x7c00u : 0x7bffu);
+ if (exp32>=113u) {
+  uint halfbits=((exp32-112u)<<10u)|(fraction>>13u);
+  uint rem=fraction & 8191u;
+  if(rne && (rem>4096u || (rem==4096u && (halfbits&1u)!=0u))) halfbits++;
+  return sign|halfbits;
+ }
+ if(exp32<102u) return sign;
+ uint shift=126u-exp32;
+ uint mantissa=0x800000u|fraction;
+ uint halfbits=mantissa>>shift;
+ uint rem=mantissa&((1u<<shift)-1u);
+ uint halfway=1u<<(shift-1u);
+ if(rne && (rem>halfway || (rem==halfway && (halfbits&1u)!=0u))) halfbits++;
+ return sign|halfbits;
+}
+float hround(float x){return unpackHalf2x16(half_bits_common(floatBitsToUint(x),true)).x;}
+// Float-float arithmetic: every elementary operation rounds to binary32.
+// Veltkamp split 4097 gives exact two-product for the bounded normal operands.
+vec2 ff_add(vec2 a, vec2 b) {
+ precise float s=a.x+b.x;
+ precise float v=s-a.x;
+ precise float e=(a.x-(s-v))+(b.x-v);
+ precise float t=(e+a.y)+b.y;
+ precise float h=s+t;
+ precise float l=t-(h-s);
+ return vec2(h,l);
+}
+vec2 two_product(float a, float b) {
+ precise float p=a*b;
+ precise float ca=4097.0*a;
+ precise float ah=ca-(ca-a);
+ precise float al=a-ah;
+ precise float cb=4097.0*b;
+ precise float bh=cb-(cb-b);
+ precise float bl=b-bh;
+ precise float e=(((ah*bh-p)+ah*bl)+al*bh)+al*bl;
+ return vec2(p,e);
+}
+vec2 ff_mul(vec2 a, vec2 b) {
+ precise vec2 p=two_product(a.x,b.x);
+ precise float e=((p.y+a.x*b.y)+a.y*b.x)+a.y*b.y;
+ precise float h=p.x+e;
+ precise float l=e-(h-p.x);
+ return vec2(h,l);
+}
+// Bounded softmax domain: finite x <= 0. Below -87 returns zero by contract;
+// this intentionally is NOT a general replacement for the C library routine.
+float exp_det(float x) {
+ if(x < -87.0) return 0.0;
+ precise float nf=floor(x*1.4426950408889634+0.5);
+ int n=int(nf);
+ precise vec2 r=ff_add(vec2(x,0.0),ff_mul(vec2(-nf,0.0),vec2(0.693147182464599609375,-1.904654323148236e-9)));
+ // Degree-12 Taylor polynomial on abs(r) <= approximately ln(2)*0.5.
+ precise vec2 p=vec2(2.0876755879584152e-9,0.0);
+ p=ff_add(ff_mul(p,r),vec2(2.5052107943679403e-8,0.0));
+ p=ff_add(ff_mul(p,r),vec2(2.755731998149713e-7,-7.575112438e-15));
+ p=ff_add(ff_mul(p,r),vec2(2.7557318844628753e-6,3.793571484e-14));
+ p=ff_add(ff_mul(p,r),vec2(2.4801587642286904e-5,-3.68810676e-13));
+ p=ff_add(ff_mul(p,r),vec2(0.00019841270113829523,-2.725596876e-12));
+ p=ff_add(ff_mul(p,r),vec2(0.0013888889225199819,-3.363109568e-11));
+ p=ff_add(ff_mul(p,r),vec2(0.008333333767950535,-4.346172016e-10));
+ p=ff_add(ff_mul(p,r),vec2(0.0416666679084301,-1.241763433e-9));
+ p=ff_add(ff_mul(p,r),vec2(0.1666666716337204,-4.967053731e-9));
+ p=ff_add(ff_mul(p,r),vec2(0.5,0.0));
+ p=ff_add(ff_mul(p,r),vec2(1.0,0.0));
+ p=ff_add(ff_mul(p,r),vec2(1.0,0.0));
+ precise float rounded=p.x+p.y;
+ precise float scale=intBitsToFloat((n+127)<<23);
+ precise float result=rounded*scale;
+ return result;
+}
+// Correct-neighbour selection for 1 <= s <= 2, with exact product residual.
+float rcp_det(float s) {
+ precise float y=uintBitsToFloat(0x7ef311c3u-floatBitsToUint(s));
+ for(int i=0;i<4;i++) {
+  precise float sy=s*y;
+  precise float correction=2.0-sy;
+  y=y*correction;
+ }
+ precise vec2 product=two_product(s,y);
+ precise vec2 residual=ff_add(vec2(1.0,0.0),-product);
+ bool up=residual.x>0.0 || (residual.x==0.0 && residual.y>0.0);
+ uint bits=floatBitsToUint(y);
+ precise float neighbour=uintBitsToFloat(up ? bits+1u : bits-1u);
+ precise float step=(neighbour-y)*0.5;
+ precise vec2 midpoint=two_product(s,step);
+ precise vec2 delta=ff_add(residual,-midpoint);
+ bool beyond=up ? (delta.x>0.0 || (delta.x==0.0 && delta.y>0.0))
+                : (delta.x<0.0 || (delta.x==0.0 && delta.y<0.0));
+ bool tie=delta.x==0.0 && delta.y==0.0;
+ return beyond || (tie && (bits&1u)!=0u) ? neighbour : y;
+}
+
+layout(local_size_x=128) in;
+layout(std430,binding=0) readonly buffer Query{float v[];} q;
+layout(std430,binding=1) readonly buffer Cache{float v[];} cache;
+layout(std430,binding=2) writeonly buffer Output{float v[];} outvec;
+uniform uint uPosition;
+void main(){
+ uint lane=gl_LocalInvocationID.x;
+ uint head=gl_WorkGroupID.x;
+ uint kvhead=head/2u;
+ precise float scores[2];
+ for(uint pos=0u;pos<2u;pos++){
+  precise float score=0.0;
+  if(pos<=uPosition){
+   for(uint j=0u;j<128u;j++)
+    score+=hround(q.v[head*128u+j])*cache.v[pos*2048u+kvhead*128u+j];
+   score*=0.08838834764831845;
+  }else score=-1.0e30;
+  scores[int(pos)]=score;
+ }
+ precise float top=max(scores[0],scores[1]);
+ precise float e0=exp_det(scores[0]-top);
+ precise float e1=(uPosition==0u?0.0:exp_det(scores[1]-top));
+ precise float inv=rcp_det(e0+e1);
+ precise float x=cache.v[kvhead*128u+1024u+lane];
+ if(uPosition==0u){outvec.v[head*128u+lane]=x;return;}
+ precise float y=cache.v[2048u+kvhead*128u+1024u+lane];
+ // GGML CPU F16 attention accumulator rounds after scale and vector addition.
+ precise float partial=(scores[1]>scores[0])
+    ? hround(x*e0)+y
+    : x+y*e1;
+ precise float rounded=hround(partial);
+ outvec.v[head*128u+lane]=rounded*inv;
+}

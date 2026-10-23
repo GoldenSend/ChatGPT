@@ -1,6 +1,6 @@
 {
  "schema": "true-garden-gpu-checkpoint/1",
- "updated_utc": "2026-10-23T21:45:00Z",
+ "updated_utc": "2026-10-23T21:55:00Z",
  "repo": "GoldenSend/ChatGPT",
  "branch": "claude/project-thread-uovzkj",
  "pull_request": "https://github.com/GoldenSend/ChatGPT/pull/2 (draft)",
@@ -65,8 +65,15 @@
   },
   "gate_rehearsal_llvmpipe": {
    "label": "ARTIFACT_VERIFIED",
-   "result": "replay bundle: 126/126 reference-backed outputs bit-exact vs llama.cpp/CPU refs; ABC PASS (189 dispatches) from the final .tar.gz with numpy unimportable; wrong boot, software renderer, tampered bundle HOLD (exit 2); RTZ FP16 FAIL in B (B1_f16r) and C step 0 (exit 4). LLVMPipe only, NOT hardware; TESTS/test_gate_stops.sh 16/16 stop paths behave as specified",
+   "result": "replay bundle: 126/126 reference-backed outputs bit-exact vs llama.cpp/CPU refs; ABC PASS (189 dispatches) from the final .tar.gz with numpy unimportable; wrong boot, software renderer, tampered bundle HOLD (exit 2); RTZ FP16 FAIL in B (B1_f16r) and C step 0 (exit 4). LLVMPipe only, NOT hardware; TESTS/test_gate_stops.sh 22/22 stop paths behave as specified",
    "file": "RESULTS/gate_rehearsal_llvmpipe.txt"
+  },
+  "gpu022_run1_hardware": {
+   "label": "LIVE_OBS (owner's paste)",
+   "at": "2026-10-23T21:42Z",
+   "boot_id": "092d4a88-7f6f-4c4e-a1e3-238d727d6048",
+   "result": "step A PASS on Liverpool (7/7 shaders compile+link; radeonsi liverpool, LLVM 19.1.7, ES 3.2, Mesa 24.0.9 via run-with-mesa24.sh, GBM renderD128); HOLD at the health check after A: flush-8:0 kworker in D in 5/5 samples; B and C not run; no kernel messages during the run",
+   "follow_up": "read-only check 21:48Z clean (no D, Dirty 136 kB, Writeback 0); no hung-task detector in this kernel; gate v3 (RAM run dir, I/O-progress stall rule); owner approved one rerun 21:45Z into ~/ps4-llm-test/gpu-022b"
   }
  },
  "synthetic_model_sha256": {
@@ -78,9 +85,9 @@
   "synth-q4km-s3.gguf": "9116401ebae1279c1bb031eda78293e2dfcf396a11a7313ab816134bb021edf9"
  },
  "file_sha256": {
-  "GATE-GPU-022.md": "37dea1138e770c9910c5f1002f177e5fe0858f66316219dc3df2a1755d82faa6",
+  "GATE-GPU-022.md": "a7e2a2d78b6b4435cd1767ed9a11ac8a3a27a8c4203b4d6f74870747e045a415",
   "TESTS/test_emu_vs_oracle.py": "e58ffa6073ed48aa9e8359871308576666242c73ec5b66ea632d5364b26083e7",
-  "TESTS/test_gate_stops.sh": "41d2b3bd09eb3eb7d3761856986b5a9b6ee75d78873b22f3abcce2d8ea96b433",
+  "TESTS/test_gate_stops.sh": "e5421ac5c0e05691365f0f4c4adf57d570687a9c74df1305b9adf75500844296",
   "TESTS/test_gles_exact_lib.py": "ea9773f5bdb47e7decc533e8c05217606fcb57a1232113904b637a39cff06674",
   "TESTS/test_gles_fa_vs_oracle.py": "3554f464b7286b6ea0083e09ae22b53502d9efbd065ada38913809f5c34cc96c",
   "TESTS/test_gles_layer_vs_oracle.py": "e7368ed645aa0fd552a07ef5104ec2dca6e3aa69e5fa94fbff854bbe03b996e6",
@@ -106,7 +113,7 @@
   "tools/gles_run.c": "12c21509f7c43dba074378926b3459f81346103690b150a133efa19df65e1cd4",
   "tools/gles_run.py": "15f6ec786840ae1ca585544c19e834e5e36126bddac999a0e42a97df53b80d31",
   "tools/gles_run_guarded.sh": "ac318a30530097076dd6e41593d1f3ade645f8bf8dd500bf6721a3e66c18fbf4",
-  "tools/gpu022_gate.sh": "faf9f87dcc8a9e6863c387081bb0e73959c45f2a9ae4adc26b0e5e84af2d4f4a",
+  "tools/gpu022_gate.sh": "49e3864a4300fdc0cc48020c8327124f5b34732d9c6524c64706eeba83ccbb44",
   "tools/gpu022_preflight.sh": "49da684e8a46b049a199811e6661f986fc4fa0b9b0ab67eff4c00a29a7a6deab",
   "tools/make_gate_plan.py": "b5834b1549133fdc94881db29d88e8ad8d0f89f0212ecbe1ca593848a2784c0e",
   "tools/make_synth_qwen3.py": "33b68f0ab5bf3448c3e1971527d32d14ba68ca88d6037e079bc06a09e72c1c09"
@@ -156,7 +163,7 @@
  "next_actions": [
   {
    "who": "owner on the IdeaPad",
-   "what": "git pull, bundle sha check, staging, one gate run on boot 092d4a88 (GATE-GPU-022.md phase 2)"
+   "what": "rerun: git pull, sha check, staging into ~/ps4-llm-test/gpu-022b, sync, one gate run on boot 092d4a88"
   },
   {
    "who": "lead",
@@ -179,7 +186,7 @@
  },
  "gate_bundle": {
   "path": "gate/gpu022-bundle.tar.gz",
-  "sha256": "aa314a7a973fcbdc60a3b153a4b83c31f1b44b93b89e7ec0245be4f498521091",
+  "sha256": "a2472e72441e0f4d65ed99a10bee6f6e144408216c7d5e006000a8b54d87b8b1",
   "files": 257,
   "size": "16 MB",
   "content": "plan B 7 dispatches + plan C 182 dispatches (layer 0, 7 decode steps, synth-q4km-s1, dump s1_long), content-addressed inputs, expected/ = verified LLVMPipe replay",

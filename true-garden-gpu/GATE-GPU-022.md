@@ -46,6 +46,15 @@ cd $M/repo && git pull -q && bash true-garden-gpu/tools/gpu022_preflight.sh 2>&1
 | GPU-021 runner | opened `/dev/dri/renderD128` (GBM) and required `liverpool` in `GL_RENDERER` | same device; the gate now requires `liverpool` too |
 | `~/ps4-llm-test/gpu-022` | absent | OK |
 
+## Run 1 (2026-10-23 21:42Z): step A PASS on Liverpool, then HOLD before any dispatch
+
+- Step A (LIVE_OBS via the owner's paste): all 7 shaders compiled and linked; local sizes within `GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS` 1024; `GL_RENDERER: AMD Radeon Graphics (radeonsi, liverpool, LLVM 19.1.7, DRM 3.35, 5.4.247-DFAUS-blkscrn_Fix_mt7668_hdmia)`, `OpenGL ES 3.2 Mesa 24.0.9`, through `run-with-mesa24.sh` and GBM on `renderD128`. First hardware evidence for these shaders (compile only).
+- HOLD at the health check after A: `kworker/u16:2+flush-8:0` (USB write-back) was in D in all 5 samples. B and C did not run. Aftercare: same boot, 49 C.
+- Read-only check at 21:48Z: no process in D over 5 s, `Dirty` 136 kB, `Writeback` 0; `dmesg` before and after the run identical (no kernel message at all during the run; the 128 KiB log buffer is full, so it wraps); the gate's own writes were small (`step-a-stderr.log` 1.1 KB: `AMD_DEBUG=cs` printed no ISA with this Mesa); `/proc/sys/kernel/hung_task_timeout_secs` absent, so this kernel never reports blocked tasks; `/dev/shm` is tmpfs (3.4 GB).
+- Reading (INFERENCE): a slow USB stick taking several seconds to commit even small writes, not a stall. The rule could not tell the two apart.
+- Fix (gate v3): the run writes only to `/dev/shm` until aftercare; a stuck non-GPU process stops the gate only if no block I/O completed during the 4 s; GPU-related threads and a still-alive runner stop it at once; every failing condition is listed. `TESTS/test_gate_stops.sh`: 22 of 22.
+- The owner approved one rerun at 21:45Z ("Approve one rerun"): same scope, new folder `~/ps4-llm-test/gpu-022b/`, no further retry.
+
 ## Phase 2: what the approval covers
 
 The bundle is `gate/gpu022-bundle.tar.gz` in this folder (sha256 in `CHECKPOINT.json`):
@@ -92,7 +101,8 @@ Every dispatch has a 120 s timeout. The health checks run before A, after A, aft
 - The boot ID differs from the pin (HOLD, exit 2).
 - The bundle hash check fails (HOLD).
 - The GL libraries do not load through `MESA_WRAPPER` (HOLD; `dlopen` only, no device opened).
-- A process stays in D state for 4 s or more (in all of 5 samples 1 s apart) and is a user process, looks GPU- or storage-related, or is a kernel thread `D_ALLOW` does not match (HOLD). Short D waits for journal commits and writeback on the USB root are normal and do not stop it.
+- A process stays in D state for 4 s or more (in all of 5 samples 1 s apart) and looks GPU-related, or no block I/O completed during those 4 s (a stall); `D_ALLOW` can excuse a non-storage kernel thread only. A process waiting while the disks keep completing I/O is logged, not a stop (HOLD otherwise).
+- A GPU runner process is still alive between dispatches (HOLD).
 - A kernel-log line newer than the gate's start (by timestamp), not matched by `DMESG_IGNORE`, mentions the GPU, DRM, the ring, a timeout, a fault, a hang, an I/O error, a reset, USB or a blocked task (HOLD).
 - The temperature is above 75 C (HOLD).
 - A dispatch fails or times out (HOLD).
