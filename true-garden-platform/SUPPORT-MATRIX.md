@@ -12,13 +12,16 @@ Stack: Debian 13, kernel `5.4.247-DFAUS-blkscrn_Fix_mt7668_hdmia` (PNY bzImage s
 
 **Evidence classes:** `LIVE_OBS`, `ARTIFACT_VERIFIED`, `USER_REPORTED`, `PUBLIC_CLAIM`, `INFERENCE`, `UNKNOWN` (as in the project rules). Rows dated before 2026-10-23 describe earlier boots. The 10-23 power loss means only the 10-23 recovery facts describe the current boot.
 
+**Update 2026-10-23 21:27Z:** the owner's read-only GPU-022 preflight (boot `092d4a88`, up 1:03, relayed by the GPU thread) settled several rows. They are marked `LIVE_OBS 10-23`.
+
 **Important distinction:** the hardware has a capability (for example, Liverpool has UVD/VCE video blocks) ≠ the installed Linux stack exposes it ≠ it works on this console.
 
 ## 1. Liverpool GPU (1002:9923, GCN 1.1 / GFX7, 18 CU)
 
 | Capability | State | Evidence |
 |---|---|---|
-| amdgpu kernel driver, render node `/dev/dri/renderD128` | `PROVEN` (2026-10-12/14 runs) | GPU-012/014/016/021b opened the node and dispatched (`USER_REPORTED`, packet + handoff) |
+| amdgpu kernel driver, render node `/dev/dri/renderD128` | `PROVEN` (LIVE_OBS 10-23) | amdgpu 3.35.0 bound to 1002:9923, card0 + renderD128; earlier runs dispatched (`USER_REPORTED`) |
+| System GL/EGL/GLES/GBM libraries | `BLOCKED` (by design) | LIVE_OBS 10-23: none in `/usr/lib/x86_64-linux-gnu`. Hardware GL only through the opt-in runtime `run-with-mesa24.sh` (needs render-group access) |
 | OpenGL ES 3.2 compute (radeonsi, isolated Mesa 24.0.9) | `PARTIAL` | Q4_K canary 1024/1024; Hybrid 003/004 logits bit-identical; layer 0 token 0 7/7; **token 1 573/1024 bad** (GPU-021b). Numerically incorrect for multi-token today (`USER_REPORTED`) |
 | Bit-exact ggml-matching compute shaders | `PASS_OFFLINE` only | PR #2, LLVMPipe, synthetic weights; GPU-022 pending (`ARTIFACT_VERIFIED` offline) |
 | Desktop OpenGL (GL 4.6 radeonsi) | `EXTERNAL` | Baikal consoles with patched Mesa (Linux psX, issue #2). Not tried here; True Garden runs headless |
@@ -29,7 +32,7 @@ Stack: Debian 13, kernel `5.4.247-DFAUS-blkscrn_Fix_mt7668_hdmia` (PNY bzImage s
 | Performance vs CPU | `BLOCKED` | ~46 ms per layer (~0.8 t/s extrapolated) vs 14-24 t/s CPU; hybrid 3.0 vs 7.6 t/s (`USER_REPORTED`). Blocked first on correctness, then on dispatch overhead and possibly the clock |
 | UVD H.264 decode | `EXTERNAL` | 900-frame exact decode on Baikal with an experimental kernel transport + Mesa 26.2.5 (`PUBLIC_CLAIM`). Not in our 5.4 stack (`INFERENCE`) |
 | VCE encode | `UNKNOWN` | not qualified anywhere public |
-| HDMI scanout / KMS | `UNKNOWN` (P7) | the DM black-screen fix is in our kernel's name; headless use so far |
+| HDMI scanout / KMS | `PARTIAL` (LIVE_OBS 10-23) | HDMI works; boot log shows `amdgpu_atombios_dp_link_train` "clock recovery failed" at 1.37 s (display bridge path) |
 
 ## 2. CPU (8x AMD Jaguar, 2 modules)
 
@@ -62,8 +65,8 @@ Stack: Debian 13, kernel `5.4.247-DFAUS-blkscrn_Fix_mt7668_hdmia` (PNY bzImage s
 | Filesystem integrity after power loss | `PARTIAL` | errors 0 on one recovery; no fsck run (none authorised) |
 | Internal HDD (Hitachi HTS545032B9SA00, 320 GB) enumeration | `PARTIAL` | **only on satadiag1** (10-13, irq 27, read-only set by hand). **Not on the current stock kernel** (`USER_REPORTED`) |
 | Internal HDD read (partition table, data) | `BLOCKED` | not authorised; Sony partitions are encrypted (EAP/UFS stack not supported by any public Linux tree) |
-| Standalone AHCI 00:14.2 (optical port) | `BLOCKED` | ATAPI `cmd 0xa1` IDENTIFY failures every boot (`USER_REPORTED`); Blu-ray drive not detected on any public tree |
-| mmc0 (Belize SD/MMC host, 90cb) | `PARTIAL` | timeouts seen at the 10-23 boot (`USER_REPORTED`). `INFERENCE`: this host carries the SDIO Wi-Fi/BT, not root storage. Confirm with P3 |
+| Standalone AHCI 00:14.2 (optical port) | `BLOCKED` | LIVE_OBS 10-23: ata1 ATAPI `cmd 0xa1` qc timeouts and "failed to IDENTIFY" at 7, 18 and 49 s, boot only. Same as every earlier boot. Blu-ray not detected on any public tree |
+| mmc0 (Belize SD/MMC host, 90cb) | `PARTIAL` | LIVE_OBS 10-23: 937 sdhci timeout/register-dump lines, last at 533 s, then quiet. No `mmcblk` device, so **not storage**. Most likely the SDIO Wi-Fi/BT (`INFERENCE`; P3 confirms the card ID) |
 | Persistent HDD write protection | `BLOCKED` | `blockdev --setro` does not survive a reboot; would need a udev rule or `libata.force` |
 | Recovery | `PARTIAL` | original SanDisk = OS rollback; single AES archive of the old PNY on the HP; restore never exercised (`USER_REPORTED`) |
 
@@ -108,7 +111,8 @@ Stack: Debian 13, kernel `5.4.247-DFAUS-blkscrn_Fix_mt7668_hdmia` (PNY bzImage s
 | Suspend / resume | `HW-LIMITED` (stack) | `/sys/power/state` absent on PS4 kernels (`PUBLIC_CLAIM`) |
 | Hardware watchdog | `UNKNOWN` (P10) | the loader runs a watchdog thread in Orbis only before kexec (`PUBLIC_CLAIM`) |
 | Remote recovery | `BLOCKED` | needs the owner at the console; no out-of-band management |
-| Boot diagnostics | `PARTIAL` | dmesg/journal after boot; UART is possible but needs soldering (`PUBLIC_CLAIM`) |
+| Boot diagnostics | `PARTIAL` | dmesg/journal after boot. LIVE_OBS 10-23: `wchan` reads "-" for every D task on this kernel, so hang diagnosis needs `/proc/PID/stack` (root). The kernel log is big enough that line-count checks miss lines after the ring wraps; compare by timestamp. UART needs soldering (`PUBLIC_CLAIM`) |
+| Root I/O waits under load | `PROVEN` normal (LIVE_OBS 10-23) | jbd2/sda2-8, flush-8:0 and an events_freezable_power_ kworker each in D state in 1 of 10 samples over 20 s with atom-worker active: short I/O waits, not hangs (`INFERENCE`) |
 | Unplanned power-loss survival | `PROVEN` once | 2026-10-23: relaunch worked, ext4 errors 0 (`USER_REPORTED`) |
 
 ## 9. General Linux capabilities

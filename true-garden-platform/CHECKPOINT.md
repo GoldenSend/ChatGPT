@@ -33,6 +33,8 @@ Written 2026-10-23 ~21:10 UTC by the cloud platform thread. **No PS4, IdeaPad or
 | mmc0 timeouts | Belize SD/MMC host `90cb`, which carries the SDIO Wi-Fi/BT. Root is USB on `00:14.7` | timeouts continuing for hours, D-state threads with mmc wchan blocking unrelated work | P3: `mmc_host` → PCI function, SDIO card IDs |
 | Fluctuating D-state | likely transient waits in the ATA error handler or mmc kworkers during those retries | D-state in `jbd2/sda2`, `usb-storage`, `kworker` with `blk_*`/`io_schedule` wchan, or in the GPU runner | D-state census with wchan, 3 samples (in the probe) |
 
+**Update 2026-10-23 21:27Z (owner-run read-only preflight, boot `092d4a88`, relayed by the GPU thread):** the triage holds. ata1 ATAPI IDENTIFY timeouts at 7, 18 and 49 s are the optical port and occur only at boot. mmc0 logged 937 timeout lines, the last at 533 s, and has no `mmcblk` device, so it is not storage. The D-state tasks seen were jbd2/sda2-8, flush-8:0 and a freezable kworker, each in 1 of 10 samples: ordinary I/O waits. `wchan` is "-" on this kernel, so the probe now reads `/proc/PID/stack` for D tasks.
+
 None of this justifies relaxing a guard. The GPU thread's gate already separates user processes, GPU/storage threads and known-unrelated threads.
 
 ## 4. What was produced

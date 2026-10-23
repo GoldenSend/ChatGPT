@@ -48,10 +48,16 @@ t sh -c 'for d in /sys/bus/mmc/devices/*; do echo "$d"; cat $d/uevent 2>/dev/nul
 t sh -c 'dmesg 2>/dev/null | grep -i -E "mmc[0-9]|sdhci|mt76|mt7668|mwifiex|btmtk|bluetooth|hci0" | head -60'
 t sh -c 'ls /sys/class/net; ls /sys/class/bluetooth 2>/dev/null'
 
-h D-state census with wait channel, 3 samples 2 s apart
+h D-state census, 3 samples 2 s apart
+# wchan prints "-" on this 5.4 kernel (preflight 2026-10-23), so also read the
+# kernel stack of each D task (root only, read-only; empty otherwise).
 for i in 1 2 3; do
   date -u +%T
-  ps -eo pid,ppid,stat,etime,wchan:32,comm --no-headers | awk '$3 ~ /^D/'
+  ps -eo pid,ppid,stat,etime,wchan:32,comm --no-headers | awk '$3 ~ /^D/' |
+  while read -r pid rest; do
+    echo "$pid $rest"
+    head -8 "/proc/$pid/stack" 2>/dev/null | sed 's/^/    /'
+  done
   sleep 2
 done
 
