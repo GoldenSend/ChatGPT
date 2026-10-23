@@ -1,0 +1,84 @@
+{
+  "mission": "PS4-NATIVE-LINUX-PLATFORM-001",
+  "tracks": {
+    "B": "PASS_OFFLINE (audit + documents); probe HOLD until PS4 free",
+    "C": "DESIGN_ONLY"
+  },
+  "written_utc": "2026-10-23T21:10Z",
+  "ps4_contact": false,
+  "southbridge": {
+    "value": "Belize",
+    "class": "INFERENCE",
+    "basis": "10-13 LIVE_OBS PCI IDs 104d:90ca/90cf + pci.ids",
+    "contradiction": "sony-jaguar-devs table lists CUH-2215B as Baikal"
+  },
+  "sources": {
+    "meerzulee/linux-ps4": "25ccb79f45c228535a0e0c164b48e14deecf65d8",
+    "meerzulee/linux-psx": "2138063970722631aa0a7cb7f034ba3e11b82507",
+    "ps4-linux/ps4-linux-loader v25": "9acef9fbf79097a2bb39d6c9c17228198bc445cc",
+    "feeRnt/ps4-linux-12xx 5.4.247-baikal-dfaus (cited)": "1fdfbd9a4c5690602893f6d5f65e154c6d9ba711",
+    "crashniels/linux ps4-linux-6.15.y-baikal (cited)": "b3b6b1e4fe8754482186f1d894a8eda431dbcd05",
+    "rmux 7.1.7 import (via linux-psx)": "platforms/ps4/patches/rmux-7.1.7"
+  },
+  "findings": [
+    {
+      "id": "F1",
+      "class": "INFERENCE",
+      "text": "Console is Belize; Linux psX 6.18/7.2 hardware results are Baikal-only"
+    },
+    {
+      "id": "F2",
+      "class": "PUBLIC_CLAIM",
+      "text": "loader v25 reads boot files from /mnt/usb0, /mnt/usb1, /data/linux/boot, /user/system/boot and appends GPU microcode, EDID and /key/eap_hdd_key.bin to the initramfs"
+    },
+    {
+      "id": "F3",
+      "class": "PUBLIC_CLAIM",
+      "text": "rmux: Liverpool SCLK at strap (~200-300 MHz) after kexec soft reset; patch later removed as unused; unproven"
+    },
+    {
+      "id": "F4",
+      "class": "PUBLIC_CLAIM",
+      "text": "legacy ps4fancontrol corrupts EMC fan config until power cycle"
+    },
+    {
+      "id": "F5",
+      "class": "PUBLIC_CLAIM",
+      "text": "stock Mesa identifies Liverpool as Kaveri (2 RBs); PS4 family patch fixes graphics; compute impact not shown"
+    },
+    {
+      "id": "F6",
+      "class": "PUBLIC_CLAIM",
+      "text": "RADV on Liverpool still has GPU-completion stalls on Mesa 26.2.5 (Baikal); Vulkan not production-safe"
+    },
+    {
+      "id": "F7",
+      "class": "INFERENCE",
+      "text": "10-23 SATA IDENTIFY errors match the known optical port on 00:14.2; mmc0 is the SDIO Wi-Fi host, not root (confirmed by 10-23 preflight)"
+    }
+  ],
+  "tests": [
+    {
+      "name": "readonly_platform_probe.sh bash -n",
+      "result": "PASS"
+    },
+    {
+      "name": "probe remote section dry run in cloud container (not PS4), WITH_GPU_SYSFS=1",
+      "result": "PASS (exit 0, 14 sections, soft-fails on missing tools)"
+    }
+  ],
+  "hardware_results": [],
+  "next_action": "after GPU-022 releases the PS4, owner runs tools/readonly_platform_probe.sh once and attaches the output",
+  "live_obs_20261023_preflight": {
+    "source": "owner-run GPU-022 read-only preflight, relayed by GPU thread",
+    "boot_id_prefix": "092d4a88",
+    "utc": "2026-10-23T21:27Z",
+    "amdgpu": "3.35.0 on 1002:9923, card0+renderD128",
+    "system_gl_libs": "absent; opt-in Mesa 24.0.9 runtime only",
+    "mmc0": "937 timeout lines, last at 533 s, no mmcblk",
+    "ata1": "ATAPI 0xa1 IDENTIFY timeouts at 7/18/49 s, boot only",
+    "wchan": "'-' for all D tasks",
+    "dstate": "jbd2/sda2-8, flush-8:0, freezable kworker 1/10 samples each",
+    "display": "dp_link_train clock recovery failed at 1.37 s; HDMI works"
+  }
+}
